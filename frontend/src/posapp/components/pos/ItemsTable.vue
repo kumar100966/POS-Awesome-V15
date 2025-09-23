@@ -40,6 +40,8 @@
 					item-value="uom"
 					hide-details
 					@update:model-value="calcUom(item, $event)"
+					@click.stop
+					@mousedown.stop
 					:disabled="!!item.posa_is_replace || (isReturnInvoice && invoice_doc.return_against)"
 					prepend-inner-icon="mdi-weight"
 				></v-select>
@@ -485,6 +487,7 @@ export default {
 					if (
 						header.required ||
 						header.key === "item_name" ||
+						header.key === "uom" ||
 						header.key === "qty" ||
 						header.key === "actions"
 					) {
@@ -494,10 +497,10 @@ export default {
 					// Hide columns based on container width
 					if (this.containerWidth < 500) {
 						// Ultra-compact: only essential columns
-						return ["item_name", "qty", "amount", "actions"].includes(header.key);
+						return ["item_name", "uom", "qty", "amount", "actions"].includes(header.key);
 					} else if (this.containerWidth < 700) {
 						// Compact: essential + rate
-						return ["item_name", "qty", "rate", "amount", "actions"].includes(header.key);
+						return ["item_name", "uom", "qty", "rate", "amount", "actions"].includes(header.key);
 					} else if (this.containerWidth < 900) {
 						// Medium: hide advanced columns
 						return !["discount_value", "price_list_rate"].includes(header.key);
@@ -677,15 +680,16 @@ export default {
 
 		calculateColumnWidth(header) {
 			const baseWidths = {
-				item_name: { min: 150, max: 250, ratio: 0.3 },
+				item_name: { min: 200, max: 350, ratio: 0.35 },
+				uom: { min: 100, max: 140, ratio: 0.12 },
 				qty: { min: 120, max: 160, ratio: 0.15 },
-				rate: { min: 100, max: 130, ratio: 0.12 },
-				amount: { min: 100, max: 130, ratio: 0.12 },
-				discount_value: { min: 80, max: 110, ratio: 0.1 },
-				discount_amount: { min: 90, max: 120, ratio: 0.11 },
-				price_list_rate: { min: 110, max: 140, ratio: 0.13 },
-				actions: { min: 80, max: 100, ratio: 0.08 },
-				posa_is_offer: { min: 60, max: 80, ratio: 0.06 },
+				rate: { min: 90, max: 120, ratio: 0.11 },
+				amount: { min: 90, max: 120, ratio: 0.11 },
+				discount_value: { min: 70, max: 100, ratio: 0.08 },
+				discount_amount: { min: 80, max: 110, ratio: 0.09 },
+				price_list_rate: { min: 100, max: 130, ratio: 0.11 },
+				actions: { min: 70, max: 90, ratio: 0.07 },
+				posa_is_offer: { min: 50, max: 70, ratio: 0.05 },
 			};
 
 			const config = baseWidths[header.key] || { min: 80, max: 120, ratio: 0.1 };
@@ -696,7 +700,8 @@ export default {
 
 		calculateMinColumnWidth(header) {
 			const minWidths = {
-				item_name: 120,
+				item_name: 180,
+				uom: 90,
 				qty: 100,
 				rate: 80,
 				amount: 80,
@@ -955,8 +960,54 @@ export default {
 }
 
 .table-uom-select {
-	min-width: 120px;
-	max-width: 160px;
+	min-width: 100px;
+	max-width: 140px;
+	width: 100% !important;
+}
+
+/* Improve item name column display */
+.pos-table :deep(.v-data-table-column--align-start) {
+	text-align: left !important;
+}
+
+/* Ensure item name content is properly displayed */
+.pos-table :deep(td[data-column-key="item_name"]),
+.pos-table :deep(th[data-column-key="item_name"]) {
+	min-width: 180px !important;
+	max-width: 350px !important;
+	white-space: normal !important;
+	word-wrap: break-word !important;
+}
+
+/* Ensure UOM column has proper space */
+.pos-table :deep(td[data-column-key="uom"]),
+.pos-table :deep(th[data-column-key="uom"]) {
+	min-width: 90px !important;
+	max-width: 140px !important;
+}
+
+/* Improve general cell text handling */
+.pos-table :deep(td) {
+	overflow: visible !important;
+	text-overflow: initial !important;
+	white-space: normal !important;
+	line-height: 1.3 !important;
+	padding: 12px 8px !important;
+}
+
+/* Specific styling for item name content */
+.pos-table :deep(td[data-column-key="item_name"] .d-flex) {
+	flex-wrap: wrap !important;
+	align-items: flex-start !important;
+	gap: 4px !important;
+}
+
+.pos-table :deep(td[data-column-key="item_name"] span) {
+	word-break: break-word !important;
+	hyphens: auto !important;
+	line-height: 1.2 !important;
+	flex: 1 1 auto !important;
+	min-width: 0 !important;
 }
 
 /* Table wrapper styling */

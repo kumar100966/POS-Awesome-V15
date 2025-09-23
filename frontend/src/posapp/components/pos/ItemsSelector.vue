@@ -1,5 +1,39 @@
 <template>
-	<div :style="responsiveStyles">
+	<v-dialog
+		v-model="showModal"
+		max-width="90vw"
+		max-height="90vh"
+		persistent
+		scrollable
+		:fullscreen="$vuetify.display.mobile"
+	>
+		<template v-slot:activator="{ props }">
+			<v-btn
+				v-bind="props"
+				color="primary"
+				size="large"
+				prepend-icon="mdi-shopping"
+				variant="elevated"
+				class="ma-2"
+			>
+				{{ __("Select Items") }}
+			</v-btn>
+		</template>
+
+		<v-card class="items-selector-modal" :style="responsiveStyles">
+			<v-card-title class="d-flex align-center px-4 py-3">
+				<v-icon class="mr-3">mdi-shopping</v-icon>
+				<span class="text-h6">{{ __("Select Items") }}</span>
+				<v-spacer></v-spacer>
+				<v-btn
+					icon="mdi-close"
+					variant="text"
+					@click="showModal = false"
+				></v-btn>
+			</v-card-title>
+			<v-divider></v-divider>
+			<v-card-text class="pa-0">
+				<div :style="responsiveStyles">
 		<v-dialog v-model="scanErrorDialog" persistent max-width="420" content-class="scan-error-dialog">
 			<v-card>
 				<v-card-title class="d-flex align-center text-error text-h6">
@@ -448,7 +482,10 @@
 			:scan-type="pos_profile.posa_camera_scan_type || 'Both'"
 			@barcode-scanned="onBarcodeScanned"
 		/>
-	</div>
+				</div>
+			</v-card-text>
+		</v-card>
+	</v-dialog>
 </template>
 
 <script type="module">
@@ -506,6 +543,7 @@ export default {
 		Skeleton,
 	},
 	data: () => ({
+		showModal: false,
 		pos_profile: {},
 		stock_settings: {},
 		flags: {},
@@ -1860,6 +1898,8 @@ export default {
 				delete payload._barcode_qty;
 				this.eventBus.emit("add_item", payload);
 				this.qty = 1;
+				// Close modal after adding item
+				this.showModal = false;
 			}
 		},
 		async enter_event() {
@@ -3332,7 +3372,24 @@ export default {
 			this.update_cur_items_details();
 		});
 	},
-
+	handleKeyboardShortcut(event) {
+		// Check for Ctrl+I or Cmd+I to open items selector modal
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'i') {
+			// Prevent default browser behavior
+			event.preventDefault();
+			// Only open if not already open and not in an input field
+			if (!this.showModal && !['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
+				this.showModal = true;
+				// Focus search field after modal opens
+				this.$nextTick(() => {
+					const searchField = this.$refs.debounce_search;
+					if (searchField && searchField.focus) {
+						searchField.focus();
+					}
+				});
+			}
+		}
+	},
 	async mounted() {
 		// Ensure POS profile is available
 		if (!this.pos_profile || !this.pos_profile.name) {
@@ -3361,6 +3418,8 @@ export default {
 
 		// Apply the configured items per page on mount
 		this.itemsPerPage = this.items_per_page;
+		// Add keyboard shortcut to open modal (Ctrl+I or Cmd+I)
+		document.addEventListener("keydown", this.handleKeyboardShortcut);
 		window.addEventListener("resize", this.checkItemContainerOverflow);
 		this.$nextTick(this.checkItemContainerOverflow);
 	},
@@ -3414,12 +3473,45 @@ export default {
 		this.eventBus.off("update_customer");
 		this.eventBus.off("force_reload_items");
 		this.eventBus.off("focus_item_search");
+		document.removeEventListener("keydown", this.handleKeyboardShortcut);
 		window.removeEventListener("resize", this.checkItemContainerOverflow);
 	},
 };
 </script>
 
 <style scoped>
+/* Modal-specific styles */
+.items-selector-modal {
+	height: 90vh;
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+}
+
+.items-selector-modal .v-card-text {
+	flex: 1;
+	overflow: hidden;
+}
+
+.items-selector-modal .dynamic-card {
+	height: 100%;
+	max-height: none;
+	border: none;
+	box-shadow: none;
+}
+
+/* Ensure proper scrolling within modal */
+.items-selector-modal .item-container {
+	max-height: calc(90vh - 150px);
+	overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+	.items-selector-modal .item-container {
+		max-height: calc(100vh - 120px);
+	}
+}
+
 /* "dynamic-card" no longer composes from pos-card; the pos-card class is added directly in the template */
 .dynamic-padding {
 	/* Equal spacing on all sides for consistent alignment */

@@ -12,32 +12,33 @@
 		<MpesaPayments></MpesaPayments>
 		<Variants></Variants>
 		<OpeningDialog v-if="dialog" :dialog="dialog"></OpeningDialog>
+		<!-- Floating ItemsSelector trigger button -->
+		<div class="items-selector-trigger">
+			<ItemsSelector></ItemsSelector>
+		</div>
+
 		<v-row v-show="!dialog" dense class="ma-0 dynamic-main-row">
-			<v-col
-				v-show="!payment && !showOffers && !coupons"
-				xl="5"
-				lg="5"
-				md="5"
-				sm="5"
-				cols="12"
-				class="pos dynamic-col"
-			>
-				<ItemsSelector></ItemsSelector>
-			</v-col>
 			<v-col v-show="showOffers" xl="5" lg="5" md="5" sm="5" cols="12" class="pos dynamic-col">
 				<PosOffers></PosOffers>
 			</v-col>
 			<v-col v-show="coupons" xl="5" lg="5" md="5" sm="5" cols="12" class="pos dynamic-col">
 				<PosCoupons></PosCoupons>
 			</v-col>
-			<v-col v-show="payment" xl="5" lg="5" md="5" sm="5" cols="12" class="pos dynamic-col">
-				<Payments></Payments>
-			</v-col>
 
-			<v-col xl="7" lg="7" md="7" sm="7" cols="12" class="pos dynamic-col">
+			<v-col
+				:xl="showOffers || coupons ? 7 : 12"
+				:lg="showOffers || coupons ? 7 : 12"
+				:md="showOffers || coupons ? 7 : 12"
+				:sm="showOffers || coupons ? 7 : 12"
+				cols="12"
+				class="pos dynamic-col"
+			>
 				<Invoice></Invoice>
 			</v-col>
 		</v-row>
+
+		<!-- Payments Modal -->
+		<Payments></Payments>
 	</div>
 </template>
 
@@ -208,6 +209,18 @@ export default {
 	/*padding-top: calc(25px + var(--dynamic-lg));*/
 	/* Navbar height (25px) + larger spacing */
 	transition: all 0.3s ease;
+}
+
+.items-selector-trigger {
+	position: fixed;
+	top: 20px;
+	right: 20px;
+	z-index: 100;
+	pointer-events: none;
+}
+
+.items-selector-trigger > * {
+	pointer-events: auto;
 }
 
 .dynamic-main-row {

@@ -1,6 +1,27 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-	<div class="pa-0">
+	<v-dialog
+		v-model="showModal"
+		max-width="95vw"
+		max-height="95vh"
+		persistent
+		scrollable
+		:fullscreen="$vuetify.display.mobile"
+	>
+		<v-card class="payments-modal">
+			<v-card-title class="d-flex align-center px-4 py-3">
+				<v-icon class="mr-3">mdi-credit-card</v-icon>
+				<span class="text-h6">{{ __("Payment") }}</span>
+				<v-spacer></v-spacer>
+				<v-btn
+					icon="mdi-close"
+					variant="text"
+					@click="back_to_invoice"
+				></v-btn>
+			</v-card-title>
+			<v-divider></v-divider>
+			<v-card-text class="pa-0">
+				<div class="pa-0">
 		<v-card
 			class="selection mx-auto pa-1 my-0 mt-3 pos-themed-card"
 			style="max-height: 68vh; height: 68vh"
@@ -707,7 +728,10 @@
 				</v-card-actions>
 			</v-card>
 		</v-dialog>
-	</div>
+				</div>
+			</v-card-text>
+		</v-card>
+	</v-dialog>
 </template>
 
 <script>
@@ -732,6 +756,7 @@ export default {
 	mixins: [format],
 	data() {
 		return {
+			showModal: false, // Modal visibility state
 			loading: false, // UI loading state
 			pos_profile: "", // POS profile settings
 			pos_settings: "", // POS settings
@@ -1042,6 +1067,7 @@ export default {
 	methods: {
 		// Go back to invoice view and reset customer readonly
 		back_to_invoice() {
+			this.showModal = false;
 			this.eventBus.emit("show_payment", "false");
 			this.eventBus.emit("set_customer_readonly", false);
 			this.$nextTick(() => {
@@ -1051,6 +1077,7 @@ export default {
 		// Highlight and focus the submit button when payment screen opens
 		handleShowPayment(data) {
 			if (data === "true") {
+				this.showModal = true;
 				this.$nextTick(() => {
 					setTimeout(() => {
 						const btn = this.$refs.submitButton;
@@ -1063,6 +1090,7 @@ export default {
 					}, 100);
 				});
 			} else {
+				this.showModal = false;
 				this.highlightSubmit = false;
 			}
 		},
@@ -2050,6 +2078,33 @@ export default {
 </script>
 
 <style scoped>
+/* Modal-specific styles */
+.payments-modal {
+	height: 95vh;
+	max-height: 95vh;
+	display: flex;
+	flex-direction: column;
+}
+
+.payments-modal .v-card-text {
+	flex: 1;
+	overflow: hidden;
+}
+
+.payments-modal .selection {
+	height: calc(95vh - 120px);
+	max-height: calc(95vh - 120px);
+	border: none;
+	box-shadow: none;
+}
+
+@media (max-width: 768px) {
+	.payments-modal .selection {
+		height: calc(100vh - 80px);
+		max-height: calc(100vh - 80px);
+	}
+}
+
 .v-text-field {
 	composes: pos-form-field;
 }
