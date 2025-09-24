@@ -23,15 +23,15 @@
 
 			<!-- Quantity column -->
 			<template v-slot:item.qty="{ item }">
-				<div class="pos-table__qty-counter" :class="{ 'rtl-layout': isRTL }" :title="`RTL: ${isRTL}`">
-					<v-btn :disabled="!!item.posa_is_replace" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--minus" @click.stop="handleMinusClick(item)">
-						<v-icon size="small">mdi-minus</v-icon>
-					</v-btn>
-					<div class="pos-table__qty-display amount-value number-field-rtl" :class="{
-						'negative-number': isNegative(item.qty),
-						'large-number': memoizedQtyLength(item.qty) > 6,
-					}" :data-length="memoizedQtyLength(item.qty)" :title="formatFloat(item.qty, hide_qty_decimals ? 0 : undefined)">
-						{{ formatFloat(item.qty, hide_qty_decimals ? 0 : undefined) }}
+					<div class="pos-table__qty-counter" :class="{ 'rtl-layout': isRTL }" :title="`RTL: ${isRTL}`">
+						<v-btn :disabled="!!item.posa_is_replace" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--minus" @click.stop="handleMinusClick(item)">
+							<v-icon size="small">mdi-minus</v-icon>
+						</v-btn>
+						<div class="pos-table__qty-display amount-value number-field-rtl" :class="{
+							'negative-number': isNegative(item.qty),
+							'large-number': memoizedQtyLength(item.qty) > 6,
+						}" :data-length="memoizedQtyLength(item.qty)" :title="formatFloat(item.qty, 0)">
+							{{ formatFloat(item.qty, 0) }}
 					</div>
 					<v-btn :disabled="!!item.posa_is_replace ||
 						((!stock_settings.allow_negative_stock || blockSaleBeyondAvailableQty) &&
@@ -121,6 +121,21 @@
 				</v-card-title>
 				<v-divider></v-divider>
 				<v-card-text class="py-6">
+					<div class="detail-overview" v-if="detailItem">
+						<v-img :src="detailItem.image || placeholderImage" class="detail-image" aspect-ratio="1" cover :alt="detailItem.item_name || detailItem.item_code">
+							<template v-slot:placeholder>
+								<div class="detail-image-placeholder">
+									<v-icon size="40" color="grey-lighten-2">mdi-image</v-icon>
+								</div>
+							</template>
+						</v-img>
+						<div class="detail-overview-content">
+							<div class="detail-description" v-if="detailDescription" v-html="detailDescription"></div>
+							<p class="detail-description detail-description--muted" v-else>
+								{{ __('No description available for this item.') }}
+							</p>
+						</div>
+					</div>
 					<div class="item-details-form">
 						<div class="form-section">
 							<div class="section-header">
@@ -132,9 +147,9 @@
 									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Item Code')" class="pos-themed-input" hide-details v-model="detailItem.item_code" disabled prepend-inner-icon="mdi-barcode"></v-text-field>
 								</div>
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.qty, hide_qty_decimals ? 0 : undefined)" @change="handleQtyChange(detailItem, $event)" :rules="[isNumber]" :disabled="!!detailItem.posa_is_replace" prepend-inner-icon="mdi-numeric"></v-text-field>
+									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.qty, 0)" @change="handleQtyChange(detailItem, $event)" :rules="[isNumber]" :disabled="!!detailItem.posa_is_replace" prepend-inner-icon="mdi-numeric"></v-text-field>
 									<div v-if="detailItem.max_qty !== undefined" class="text-caption mt-1">
-										{{ __('In stock: {0}', [formatFloat(detailItem.max_qty, hide_qty_decimals ? 0 : undefined)]) }}
+										{{ __('In stock: {0}', [formatFloat(detailItem.max_qty, 0)]) }}
 									</div>
 								</div>
 								<div class="form-field">
@@ -182,10 +197,10 @@
 							</div>
 							<div class="form-row">
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Available QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.actual_qty)" disabled prepend-inner-icon="mdi-package-variant"></v-text-field>
+									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Available QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.actual_qty, 0)" disabled prepend-inner-icon="mdi-package-variant"></v-text-field>
 								</div>
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Stock QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.stock_qty)" disabled prepend-inner-icon="mdi-scale-balance"></v-text-field>
+									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Stock QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.stock_qty, 0)" disabled prepend-inner-icon="mdi-scale-balance"></v-text-field>
 								</div>
 								<div class="form-field">
 									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Stock UOM')" class="pos-themed-input" hide-details v-model="detailItem.stock_uom" disabled prepend-inner-icon="mdi-weight-pound"></v-text-field>
@@ -228,7 +243,7 @@
 							</div>
 							<div class="form-row">
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Batch No. Available QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.actual_batch_qty)" disabled prepend-inner-icon="mdi-package-variant"></v-text-field>
+									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Batch No. Available QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.actual_batch_qty, 0)" disabled prepend-inner-icon="mdi-package-variant"></v-text-field>
 								</div>
 								<div class="form-field">
 									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Batch No Expiry Date')" class="pos-themed-input" hide-details v-model="detailItem.batch_no_expiry_date" disabled prepend-inner-icon="mdi-calendar-clock"></v-text-field>
@@ -286,6 +301,7 @@
 <script>
 /* global process */
 import _ from "lodash";
+import placeholderImage from "./placeholder-image.png";
 export default {
 	name: "ItemsTable",
 	props: {
@@ -330,6 +346,7 @@ export default {
 			editedName: "",
 			detailDialog: false,
 			detailItem: null,
+			placeholderImage,
 			// Container awareness properties
 			containerWidth: 0,
 			containerHeight: 0,
@@ -419,6 +436,41 @@ export default {
 			if (this.containerWidth < 500) return "compact";
 			if (this.containerWidth < 800) return "default";
 			return "comfortable";
+		},
+
+		detailDescription() {
+			if (!this.detailItem) {
+				return "";
+			}
+
+			const normalize = (value) => {
+				if (typeof value !== "string") {
+					return "";
+				}
+				return value
+					.replace(/<[^>]*>/g, " ")
+					.replace(/&nbsp;/gi, " ")
+					.trim();
+			};
+
+			const candidates = [
+				this.detailItem.description,
+				this.detailItem.web_long_description,
+				this.detailItem.description_html,
+				this.detailItem.item_description,
+			];
+
+			const looksLikeHtml = (value) => /<[^>]+>/.test(value);
+
+			for (const candidate of candidates) {
+				if (typeof candidate === "string" && normalize(candidate).length > 0) {
+					return looksLikeHtml(candidate)
+						? candidate
+						: candidate.replace(/\n/g, "<br />");
+				}
+			}
+
+			return "";
 		},
 
 		headerProps() {
@@ -858,8 +910,8 @@ export default {
 }
 
 .table-uom-select {
-	min-width: 100px;
-	max-width: 140px;
+	min-width: 140px;
+	max-width: 200px;
 	width: 100% !important;
 }
 
@@ -1199,6 +1251,75 @@ export default {
 .item-action-btn.plus-btn:hover {
 	background: var(--pos-button-success-hover-bg) !important;
 	color: var(--pos-button-success-hover-text) !important;
+}
+
+/* Item detail overview */
+.detail-overview {
+	display: flex;
+	gap: 16px;
+	align-items: stretch;
+	margin-bottom: 24px;
+	flex-wrap: wrap;
+}
+
+.detail-image {
+	width: 160px;
+	max-width: 40%;
+	border-radius: 12px;
+	overflow: hidden;
+	flex: 0 0 auto;
+}
+
+.detail-image-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.04);
+}
+
+.detail-overview-content {
+	flex: 1 1 220px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+}
+
+.detail-description {
+	margin: 0;
+	font-size: 0.95rem;
+	line-height: 1.5;
+	color: var(--pos-text-primary);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.detail-description--muted {
+	color: var(--pos-text-secondary, #6c757d);
+	font-style: italic;
+}
+
+:deep([data-theme="dark"]) .detail-image-placeholder,
+:deep(.v-theme--dark) .detail-image-placeholder {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+:deep([data-theme="dark"]) .detail-description--muted,
+:deep(.v-theme--dark) .detail-description--muted {
+	color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 600px) {
+	.detail-overview {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.detail-image {
+		width: 140px;
+		max-width: 100%;
+	}
 }
 
 /* =================================================================

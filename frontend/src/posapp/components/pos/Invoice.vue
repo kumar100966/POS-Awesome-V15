@@ -1426,7 +1426,8 @@ export default {
 }
 
 .invoice-content-right {
-	flex: 1 1 320px;
+	flex: 0 1 360px;
+	max-width: 360px;
 }
 
 .invoice-content-right>* {
@@ -1440,6 +1441,7 @@ export default {
 
 	.invoice-content-right {
 		flex: 1 1 auto;
+		max-width: 100%;
 	}
 }
 

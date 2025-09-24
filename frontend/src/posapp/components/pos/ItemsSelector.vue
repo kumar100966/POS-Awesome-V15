@@ -177,20 +177,15 @@
 																	</span>
 																</div>
 															</div>
-															<div class="card-item-stock">
-																<v-icon size="small" class="stock-icon">mdi-package-variant</v-icon>
-																<span class="stock-amount" :class="{
-																	'negative-number': isNegative(item.actual_qty),
-																}">
-																	{{
-																		format_number(
-																			item.actual_qty,
-																			hide_qty_decimals ? 0 : 4,
-																		) || 0
-																	}}
-																</span>
-																<span class="stock-uom">{{ item.stock_uom || "" }}</span>
+													<div v-if="getItemUomQuantities(item).length" class="card-item-stock">
+														<v-icon size="small" class="stock-icon">mdi-package-variant</v-icon>
+														<div class="stock-entries">
+															<div v-for="uomQty in getItemUomQuantities(item)" :key="uomQty.uom" class="stock-entry">
+																<span class="stock-amount" :class="{ 'negative-number': uomQty.isNegative }">{{ uomQty.formattedQty }}</span>
+																<span class="stock-uom">{{ uomQty.uom }}</span>
 															</div>
+														</div>
+													</div>
 														</div>
 													</div>
 												</div>
@@ -230,7 +225,7 @@
 													</div>
 												</template>
 												<template v-slot:item.actual_qty="{ item }">
-													<span class="golden--text" :class="{ 'negative-number': isNegative(item.actual_qty) }">{{ format_number(item.actual_qty, hide_qty_decimals ? 0 : 4) }}</span>
+													<span class="golden--text" :class="{ 'negative-number': isNegative(item.actual_qty) }">{{ format_number(item.actual_qty, 0) }}</span>
 												</template>
 											</v-data-table-virtual>
 										</div>
@@ -605,6 +600,37 @@ export default {
 	},
 
 	methods: {
+		// Utility helpers
+		getItemUomQuantities(item) {
+			if (!item) {
+				return [];
+			}
+
+			const baseQty = Number(item.actual_qty ?? 0);
+			const uoms = Array.isArray(item.item_uoms) && item.item_uoms.length > 0
+				? item.item_uoms
+				: item.stock_uom
+					? [{ uom: item.stock_uom, conversion_factor: 1 }]
+					: [];
+
+			return uoms
+				.filter((uom) => uom && uom.uom)
+				.map((uom) => {
+					const factor = Number(uom.conversion_factor) || 1;
+					const qty = factor ? baseQty / factor : baseQty;
+					const wholeQty = Number.isFinite(qty) ? Math.round(qty) : 0;
+					const formattedQty = this.format_number
+						? this.format_number(wholeQty, 0)
+						: String(wholeQty);
+					return {
+						uom: uom.uom,
+						formattedQty,
+						isNegative: qty < 0,
+					};
+				})
+				.filter((entry) => entry.formattedQty !== undefined && entry.formattedQty !== null);
+		},
+
 		// Performance optimization: Memoized search function
 		memoizedSearch(searchTerm, itemGroup) {
 			const cacheKey = `${searchTerm || ""}_${itemGroup || "ALL"}`;
@@ -3329,6 +3355,9 @@ export default {
 .select-items-trigger-btn {
 	margin: 0;
 	white-space: nowrap;
+	min-height: 52px;
+	padding-top: 12px;
+	padding-bottom: 12px;
 }
 
 /* Modal-specific styles */
@@ -3737,6 +3766,18 @@ export default {
 	background: rgba(0, 0, 0, 0.02);
 	border-radius: 6px;
 	margin-top: auto;
+}
+
+.stock-entries {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+}
+
+.stock-entry {
+	display: flex;
+	align-items: baseline;
+	gap: 4px;
 }
 
 .stock-icon {
