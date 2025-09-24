@@ -1,6 +1,6 @@
 <template>
-	<v-row justify="center">
-		<v-dialog v-model="customerDialog" max-width="600px" persistent>
+	<v-row justify="center" class="pos-dialog-host">
+		<v-dialog v-model="customerDialog" max-width="600px" persistent attach="body">
 			<v-card>
 				<v-card-title class="d-flex align-center">
 					<span v-if="customer_id" class="text-h5 text-primary">{{ __("Update Customer") }}</span>
@@ -186,7 +186,7 @@
 		</v-dialog>
 
 		<!-- Confirmation Dialog -->
-		<v-dialog v-model="confirmDialog" max-width="400px">
+		<v-dialog v-model="confirmDialog" max-width="400px" attach="body">
 			<v-card>
 				<v-card-title class="text-h5 text-primary">
 					{{ __("Confirm Close") }}
@@ -681,4 +681,8 @@ export default {
 };
 </script>
 
-<style scoped></style>
+<style scoped>
+.pos-dialog-host {
+	display: contents;
+}
+</style>

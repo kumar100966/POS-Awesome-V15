@@ -1,6 +1,5 @@
 <template>
-	<v-row justify="center">
-		<v-dialog v-model="closingDialog" max-width="900px" persistent>
+	<v-dialog v-model="closingDialog" max-width="900px" persistent attach="body">
 			<v-card elevation="8" class="closing-dialog-card">
 				<!-- Enhanced White Header -->
 				<v-card-title class="closing-header pa-6">
@@ -104,8 +103,7 @@
 					</v-btn>
 				</v-card-actions>
 			</v-card>
-		</v-dialog>
-	</v-row>
+	</v-dialog>
 </template>
 
 <script>

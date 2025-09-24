@@ -3,6 +3,7 @@
 		:model-value="modelValue"
 		max-width="330"
 		@update:model-value="$emit('update:modelValue', $event)"
+		attach="body"
 	>
 		<v-card>
 			<v-card-title class="text-h5">

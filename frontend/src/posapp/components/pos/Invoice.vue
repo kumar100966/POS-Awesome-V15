@@ -79,7 +79,7 @@
 								</v-btn>
 							</div>
 
-							<v-dialog v-model="show_column_selector" max-width="500px">
+							<v-dialog v-model="show_column_selector" max-width="500px" attach="body">
 								<v-card>
 									<v-card-title class="text-h6 pa-4 d-flex align-center">
 										<span>{{ __("Select Columns to Display") }}</span>
@@ -112,7 +112,7 @@
 
 						<!-- ItemsTable component with reorder event handler -->
 						<ItemsTable ref="itemsTable" :headers="items_headers" :items="items" v-model:expanded="expanded" :itemsPerPage="itemsPerPage" :itemSearch="itemSearch" :pos_profile="pos_profile" :invoice_doc="invoice_doc" :invoiceType="invoiceType" :stock_settings="stock_settings" :displayCurrency="displayCurrency" :formatFloat="formatFloat" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :isNumber="isNumber" :setFormatedQty="setFormatedQty" :setFormatedCurrency="setFormatedCurrency" :calcPrices="calc_prices" :calcUom="calc_uom" :setSerialNo="set_serial_no" :setBatchQty="set_batch_qty" :validateDueDate="validate_due_date" :removeItem="remove_item" :subtractOne="subtract_one" :addOne="add_one" :toggleOffer="toggleOffer" :changePriceListRate="change_price_list_rate" :isNegative="isNegative" @update:expanded="handleExpandedUpdate" @reorder-items="handleItemReorder" @add-item-from-drag="handleItemDrop" @show-drop-feedback="showDropFeedback" @item-dropped="showDropFeedback(false)" @view-packed="openPackedItems" />
-						<v-dialog v-model="show_packed_dialog" max-width="800px">
+						<v-dialog v-model="show_packed_dialog" max-width="800px" attach="body">
 							<v-card>
 								<v-card-title class="d-flex align-center">
 									<span>{{ __("Packing List") }} ({{ packed_dialog_items.length }})</span>

@@ -1,5 +1,5 @@
 <template>
-	<v-dialog v-model="scannerDialog" max-width="600px" persistent="false">
+	<v-dialog v-model="scannerDialog" max-width="600px" persistent="false" attach="body">
 		<v-card>
 			<v-card-title class="text-h5 text-primary d-flex align-center">
 				<v-icon class="mr-2" size="large">mdi-camera</v-icon>

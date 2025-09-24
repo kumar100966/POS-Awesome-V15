@@ -278,8 +278,8 @@ def get_items(
             "has_serial_no",
             "max_discount",
             "brand",
+            "description",
         ]
-        fields += ["description"] if include_description else []
         fields += ["image"] if include_image else []
 
         page_start = limit_start or 0
@@ -337,11 +337,7 @@ def get_items(
                         filters={"parent": item.name, "parentfield": "attributes"},
                     )
 
-                if (
-                    posa_display_items_in_stock
-                    and (not detail.get("actual_qty") or detail.get("actual_qty") < 0)
-                    and not item.has_variants
-                ):
+                if posa_display_items_in_stock and (not detail.get("actual_qty") or detail.get("actual_qty") < 0) and not item.has_variants:
                     continue
 
                 row = {}
@@ -688,21 +684,14 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
 
     price_list = price_list or pos_profile.get("selling_price_list")
     today = nowdate()
-    price_list_currency = frappe.db.get_value("Price List", price_list, "currency") or pos_profile.get(
-        "currency"
-    )
+    price_list_currency = frappe.db.get_value("Price List", price_list, "currency") or pos_profile.get("currency")
 
     company = pos_profile.get("company")
     allow_multi_currency = pos_profile.get("posa_allow_multi_currency") or 0
     company_currency = frappe.db.get_value("Company", company, "default_currency") if company else None
 
     exchange_rate = 1
-    if (
-        company_currency
-        and price_list_currency
-        and price_list_currency != company_currency
-        and allow_multi_currency
-    ):
+    if company_currency and price_list_currency and price_list_currency != company_currency and allow_multi_currency:
         from erpnext.setup.utils import get_exchange_rate
 
         try:
@@ -821,9 +810,7 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
             for batch in batch_list:
                 if batch.qty > 0 and batch.batch_no:
                     batch_doc = frappe.get_cached_doc("Batch", batch.batch_no)
-                    if (
-                        str(batch_doc.expiry_date) > str(today) or batch_doc.expiry_date in ["", None]
-                    ) and batch_doc.disabled == 0:
+                    if (str(batch_doc.expiry_date) > str(today) or batch_doc.expiry_date in ["", None]) and batch_doc.disabled == 0:
                         batch_no_data.append(
                             {
                                 "batch_no": batch.batch_no,
@@ -849,9 +836,7 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
     # Determine if multi-currency is enabled on the POS Profile
     allow_multi_currency = False
     if item.get("pos_profile"):
-        allow_multi_currency = (
-            frappe.db.get_value("POS Profile", item.get("pos_profile"), "posa_allow_multi_currency") or 0
-        )
+        allow_multi_currency = frappe.db.get_value("POS Profile", item.get("pos_profile"), "posa_allow_multi_currency") or 0
 
     # Ensure conversion rate exists when price list currency differs from
     # company currency to avoid ValidationError from ERPNext. Also provide
@@ -860,9 +845,7 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
         company_currency = frappe.db.get_value("Company", company, "default_currency")
         price_list_currency = company_currency
         if price_list:
-            price_list_currency = (
-                frappe.db.get_value("Price List", price_list, "currency") or company_currency
-            )
+            price_list_currency = frappe.db.get_value("Price List", price_list, "currency") or company_currency
 
         exchange_rate = 1
         if price_list_currency != company_currency and allow_multi_currency:

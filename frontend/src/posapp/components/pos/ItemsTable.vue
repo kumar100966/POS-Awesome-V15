@@ -109,7 +109,7 @@
 				<td :colspan="responsiveHeaders.length + 1"></td>
 			</template>
 		</v-data-table>
-		<v-dialog v-model="detailDialog" max-width="1100" scrollable class="item-detail-dialog">
+	<v-dialog v-model="detailDialog" max-width="1100" scrollable class="item-detail-dialog" attach="body">
 			<v-card v-if="detailItem">
 				<v-card-title class="d-flex align-center">
 					<div>
@@ -281,7 +281,7 @@
 			</v-card>
 		</v-dialog>
 
-		<v-dialog v-model="editNameDialog" max-width="400">
+	<v-dialog v-model="editNameDialog" max-width="400" attach="body">
 			<v-card>
 				<v-card-title>{{ __("Item Name") }}</v-card-title>
 				<v-card-text>
@@ -837,6 +837,7 @@ export default {
 		},
 
 		openDetailDialog(item) {
+			console.log("ItemsTable detail dialog item:", item);
 			this.detailItem = item;
 			this.detailDialog = true;
 		},

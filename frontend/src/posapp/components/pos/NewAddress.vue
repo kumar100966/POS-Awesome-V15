@@ -1,6 +1,5 @@
 <template>
-	<v-row justify="center">
-		<v-dialog v-model="addressDialog" max-width="600px">
+	<v-dialog v-model="addressDialog" max-width="600px" attach="body">
 			<v-card>
 				<v-card-title>
 					<span class="text-h5 text-primary">{{ __("Add New Address") }}</span>
@@ -66,8 +65,7 @@
 					<v-btn color="success" theme="dark" @click="submit_dialog">{{ __("Submit") }}</v-btn>
 				</v-card-actions>
 			</v-card>
-		</v-dialog>
-	</v-row>
+	</v-dialog>
 </template>
 
 <script>

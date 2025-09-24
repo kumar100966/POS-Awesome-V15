@@ -1,6 +1,5 @@
 <template>
-	<v-row justify="center">
-		<v-dialog v-model="isOpen" persistent max-width="800px" max-height="90vh">
+	<v-dialog v-model="isOpen" persistent max-width="800px" max-height="90vh" attach="body">
 			<v-card elevation="8" class="opening-dialog-card">
 				<!-- Header Section - White Background with Blue Text -->
 				<v-card-title class="opening-dialog-header">
@@ -118,8 +117,7 @@
 					</v-btn>
 				</v-card-actions>
 			</v-card>
-		</v-dialog>
-	</v-row>
+	</v-dialog>
 </template>
 
 <script>

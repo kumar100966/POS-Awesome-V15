@@ -1,5 +1,5 @@
 <template>
-	<v-dialog v-model="showModal" max-width="90vw" max-height="90vh" scrollable :fullscreen="$vuetify.display.mobile">
+	<v-dialog v-model="showModal" max-width="90vw" max-height="90vh" scrollable :fullscreen="$vuetify.display.mobile" attach="body">
 		<template v-slot:activator="{ props }">
 			<v-btn v-bind="props" color="primary" density="comfortable" prepend-icon="mdi-shopping" variant="elevated" class="select-items-trigger-btn">
 				{{ __("Select Items") }}
@@ -16,7 +16,7 @@
 			<v-divider></v-divider>
 			<v-card-text class="pa-0">
 				<div :style="responsiveStyles">
-					<v-dialog v-model="scanErrorDialog" max-width="420" content-class="scan-error-dialog" @keydown.esc.stop.prevent="acknowledgeScanError">
+					<v-dialog v-model="scanErrorDialog" max-width="420" content-class="scan-error-dialog" @keydown.esc.stop.prevent="acknowledgeScanError" attach="body">
 						<v-card>
 							<v-card-title class="d-flex align-center text-error text-h6">
 								<v-icon color="error" class="mr-2">mdi-alert-octagon</v-icon>
@@ -79,7 +79,7 @@
 													{{ __("Reload Items") }}
 												</v-btn>
 
-												<v-dialog v-model="show_item_settings" max-width="400px" @keydown.esc.stop.prevent="cancelItemSettings">
+									<v-dialog v-model="show_item_settings" max-width="400px" @keydown.esc.stop.prevent="cancelItemSettings" attach="body">
 													<v-card>
 														<v-card-title class="text-h6 pa-4 d-flex align-center">
 															<span>{{ __("Item Selector Settings") }}</span>
@@ -133,8 +133,11 @@
 															<h4 class="card-item-name">{{ item.item_name }}</h4>
 															<span class="card-item-code">{{ item.item_code }}</span>
 														</div>
-														<div class="card-item-details">
-															<div class="card-item-price">
+													<div class="card-item-details">
+													<div v-if="item.description" class="card-item-description" :title="formatDescription(item.description)">
+														{{ formatDescription(item.description) }}
+														</div>
+														<div class="card-item-price">
 																<div class="primary-price">
 																	<span class="currency-symbol">
 																		{{
@@ -193,6 +196,14 @@
 										</div>
 										<div v-else class="items-table-container">
 											<v-data-table-virtual :headers="headers" :items="filtered_items" class="sleek-data-table overflow-y-auto" :style="{ height: 'calc(100% - 80px)' }" item-key="item_code" fixed-header height="100%" :header-props="headerProps" :no-data-text="__('No items found')" @click:row="click_item_row" @scroll.passive="onListScroll">
+												<template v-slot:item.item_name="{ item }">
+													<div class="table-item-name">
+														<div class="table-item-name__title">{{ item.item_name }}</div>
+														<div v-if="item.description" class="table-item-name__description" :title="formatDescription(item.description)">
+															{{ formatDescription(item.description) }}
+														</div>
+													</div>
+												</template>
 												<template v-slot:item.rate="{ item }">
 													<div>
 														<div class="text-primary">
@@ -1202,12 +1213,16 @@ export default {
 						limit: vm.itemsPageLimit,
 						start_after: null,
 						include_image: 1,
+						include_description: 1,
 						item_groups: profileGroups,
 					},
 				});
 				console.log("[ItemsSelector] server responded", { count: response.message?.length });
 
 				const items = response.message || [];
+				if (items.length) {
+					console.log("[ItemsSelector] sample item payload", items[0]);
+				}
 
 				// Process items
 				items.forEach((item) => {
@@ -1334,13 +1349,17 @@ export default {
 							limit,
 							start_after: startAfter,
 							include_image: 1,
+							include_description: 1,
 							item_groups: profileGroups,
 						},
 						freeze: false,
 					});
-					console.log("[ItemsSelector] background load server response", {
-						count: res.message?.length,
-					});
+						console.log("[ItemsSelector] background load server response", {
+							count: res.message?.length,
+						});
+						if (Array.isArray(res.message) && res.message.length) {
+							console.log("[ItemsSelector] background sample item", res.message[0]);
+						}
 					const text = JSON.stringify(res);
 					if (this.items_request_token !== requestToken) {
 						console.log("[ItemsSelector] background load token mismatch after response");
@@ -1463,6 +1482,7 @@ export default {
 						limit,
 						start_after: startAfter,
 						include_image: 1,
+						include_description: 1,
 						item_groups: profileGroups,
 					},
 					callback: async (r) => {
@@ -2769,6 +2789,13 @@ export default {
 			const prec = typeof precision === "number" ? precision : this.currency_precision;
 			return this.formatCurrencyPlain(value, prec);
 		},
+		formatDescription(text) {
+			if (!text) {
+				return "";
+			}
+			const raw = String(text).replace(/<[^>]*>/g, "");
+			return raw.replace(/\r?\n/g, "\n").trim();
+		},
 		ratePrecision(value) {
 			const numericValue = typeof value === "string" ? parseFloat(value) : value;
 			return Number.isInteger(numericValue) ? 0 : this.currency_precision;
@@ -3713,6 +3740,15 @@ export default {
 	flex: 1;
 }
 
+.card-item-description {
+	font-size: 0.78rem;
+	color: var(--pos-text-secondary, #5f6b7a);
+	line-height: 1.4;
+	white-space: pre-line;
+	max-height: 64px;
+	overflow: hidden;
+}
+
 .card-item-price {
 	display: flex;
 	flex-direction: column;
@@ -3954,6 +3990,26 @@ export default {
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	letter-spacing: 0.01em;
+}
+
+.table-item-name {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.table-item-name__title {
+	font-weight: 600;
+	font-size: 0.85rem;
+	color: inherit;
+}
+
+.table-item-name__description {
+	font-size: 0.75rem;
+	color: var(--pos-text-secondary, #6c757d);
+	white-space: pre-line;
+	max-height: 48px;
+	overflow: hidden;
 }
 
 /* Dark theme row styling */

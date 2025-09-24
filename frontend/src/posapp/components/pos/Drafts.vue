@@ -1,6 +1,5 @@
 <template>
-	<v-row justify="center">
-		<v-dialog v-model="draftsDialog" max-width="900px">
+	<v-dialog v-model="draftsDialog" max-width="900px" attach="body">
 			<!-- <template v-slot:activator="{ on, attrs }">
         <v-btn color="primary" theme="dark" v-bind="attrs" v-on="on">Open Dialog</v-btn>
       </template>-->
@@ -44,8 +43,7 @@
 					<v-btn color="success" theme="dark" @click="submit_dialog">Load Sale</v-btn>
 				</v-card-actions>
 			</v-card>
-		</v-dialog>
-	</v-row>
+	</v-dialog>
 </template>
 
 <script>
