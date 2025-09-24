@@ -1,733 +1,327 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-	<v-dialog
-		v-model="showModal"
-		max-width="95vw"
-		max-height="95vh"
-		persistent
-		scrollable
-		:fullscreen="$vuetify.display.mobile"
-	>
+	<v-dialog v-model="showModal" max-width="95vw" max-height="95vh" persistent scrollable :fullscreen="$vuetify.display.mobile">
 		<v-card class="payments-modal">
 			<v-card-title class="d-flex align-center px-4 py-3">
 				<v-icon class="mr-3">mdi-credit-card</v-icon>
 				<span class="text-h6">{{ __("Payment") }}</span>
 				<v-spacer></v-spacer>
-				<v-btn
-					icon="mdi-close"
-					variant="text"
-					@click="back_to_invoice"
-				></v-btn>
+				<v-btn icon="mdi-close" variant="text" @click="back_to_invoice"></v-btn>
 			</v-card-title>
 			<v-divider></v-divider>
 			<v-card-text class="pa-0">
 				<div class="pa-0">
-		<v-card
-			class="selection mx-auto pa-1 my-0 mt-3 pos-themed-card"
-			style="max-height: 68vh; height: 68vh"
-		>
-			<v-progress-linear
-				:active="loading"
-				:indeterminate="loading"
-				absolute
-				location="top"
-				color="info"
-			></v-progress-linear>
-			<div ref="paymentContainer" class="overflow-y-auto pa-2" style="max-height: 67vh">
-				<!-- Payment Summary (Paid, To Be Paid, Change) -->
-				<v-row v-if="invoice_doc" class="pa-1" dense>
-					<v-col cols="7">
-						<v-text-field
-							variant="solo"
-							color="primary"
-							:label="frappe._('Paid Amount')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							v-model="total_payments_display"
-							readonly
-							:prefix="currencySymbol(invoice_doc.currency)"
-							density="compact"
-							@click="showPaidAmount"
-						></v-text-field>
-					</v-col>
-					<v-col cols="5">
-						<v-text-field
-							variant="solo"
-							color="primary"
-							label="To Be Paid"
-							class="sleek-field pos-themed-input"
-							hide-details
-							v-model="diff_payment_display"
-							:prefix="currencySymbol(invoice_doc.currency)"
-							density="compact"
-							@focus="showDiffPayment"
-							persistent-placeholder
-						></v-text-field>
-					</v-col>
+					<v-card class="selection mx-auto pa-1 my-0 mt-3 pos-themed-card" style="max-height: 68vh; height: 68vh">
+						<v-progress-linear :active="loading" :indeterminate="loading" absolute location="top" color="info"></v-progress-linear>
+						<div ref="paymentContainer" class="overflow-y-auto pa-2" style="max-height: 67vh">
+							<!-- Payment Summary (Paid, To Be Paid, Change) -->
+							<v-row v-if="invoice_doc" class="pa-1" dense>
+								<v-col cols="7">
+									<v-text-field variant="solo" color="primary" :label="frappe._('Paid Amount')" class="sleek-field pos-themed-input" hide-details v-model="total_payments_display" readonly :prefix="currencySymbol(invoice_doc.currency)" density="compact" @click="showPaidAmount"></v-text-field>
+								</v-col>
+								<v-col cols="5">
+									<v-text-field variant="solo" color="primary" label="To Be Paid" class="sleek-field pos-themed-input" hide-details v-model="diff_payment_display" :prefix="currencySymbol(invoice_doc.currency)" density="compact" @focus="showDiffPayment" persistent-placeholder></v-text-field>
+								</v-col>
 
-					<!-- Paid Change (if applicable) -->
-					<v-col cols="7" v-if="credit_change > 0 && !invoice_doc.is_return">
-						<v-text-field
-							variant="solo"
-							color="primary"
-							:label="frappe._('Paid Change')"
-							class="sleek-field pos-themed-input"
-							:model-value="formatCurrency(paid_change)"
-							:prefix="currencySymbol(invoice_doc.currency)"
-							:rules="paid_change_rules"
-							density="compact"
-							readonly
-							type="text"
-							@click="showPaidChange"
-						></v-text-field>
-					</v-col>
+								<!-- Paid Change (if applicable) -->
+								<v-col cols="7" v-if="credit_change > 0 && !invoice_doc.is_return">
+									<v-text-field variant="solo" color="primary" :label="frappe._('Paid Change')" class="sleek-field pos-themed-input" :model-value="formatCurrency(paid_change)" :prefix="currencySymbol(invoice_doc.currency)" :rules="paid_change_rules" density="compact" readonly type="text" @click="showPaidChange"></v-text-field>
+								</v-col>
 
-					<!-- Credit Change (if applicable) -->
-					<v-col cols="5" v-if="credit_change > 0 && !invoice_doc.is_return">
-						<v-text-field
-							variant="solo"
-							color="primary"
-							:label="frappe._('Credit Change')"
-							class="sleek-field pos-themed-input"
-							:model-value="formatCurrency(credit_change)"
-							:prefix="currencySymbol(invoice_doc.currency)"
-							density="compact"
-							type="text"
-							@change="
-								setFormatedCurrency(this, 'credit_change', null, false, $event);
-								updateCreditChange(this.credit_change);
-							"
-						></v-text-field>
-					</v-col>
-				</v-row>
+								<!-- Credit Change (if applicable) -->
+								<v-col cols="5" v-if="credit_change > 0 && !invoice_doc.is_return">
+									<v-text-field variant="solo" color="primary" :label="frappe._('Credit Change')" class="sleek-field pos-themed-input" :model-value="formatCurrency(credit_change)" :prefix="currencySymbol(invoice_doc.currency)" density="compact" type="text" @change="
+										setFormatedCurrency(this, 'credit_change', null, false, $event);
+									updateCreditChange(this.credit_change);
+									"></v-text-field>
+								</v-col>
+							</v-row>
 
-				<v-divider></v-divider>
+							<v-divider></v-divider>
 
-				<!-- Payment Inputs (All Payment Methods) -->
-				<div v-if="is_cashback">
-					<v-row class="payments pa-1" v-for="payment in invoice_doc.payments" :key="payment.name">
-						<v-col cols="6" v-if="!is_mpesa_c2b_payment(payment)">
-							<v-text-field
-								density="compact"
-								variant="solo"
-								color="primary"
-								:label="frappe._(payment.mode_of_payment)"
-								class="sleek-field pos-themed-input"
-								hide-details
-								:model-value="formatCurrency(payment.amount)"
-								@change="setFormatedCurrency(payment, 'amount', null, false, $event)"
-								:rules="[
-									isNumber,
-									(v) =>
-										!payment.mode_of_payment.toLowerCase().includes('cash') ||
-										this.is_credit_sale ||
-										v >=
-											(this.invoice_doc.rounded_total ||
-												this.invoice_doc.grand_total) ||
-										'Cash payment cannot be less than invoice total when credit sale is off',
-								]"
-								:prefix="currencySymbol(invoice_doc.currency)"
-								@focus="set_rest_amount(payment.idx)"
-								:readonly="invoice_doc.is_return"
-							></v-text-field>
-						</v-col>
-						<v-col cols="6" v-if="!is_mpesa_c2b_payment(payment)">
-							<v-btn block color="primary" theme="dark" @click="set_full_amount(payment.idx)">
-								{{ payment.mode_of_payment }}
-							</v-btn>
-						</v-col>
+							<!-- Payment Inputs (All Payment Methods) -->
+							<div v-if="is_cashback">
+								<v-row class="payments pa-1" v-for="payment in invoice_doc.payments" :key="payment.name">
+									<v-col cols="6" v-if="!is_mpesa_c2b_payment(payment)">
+										<v-text-field density="compact" variant="solo" color="primary" :label="frappe._(payment.mode_of_payment)" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(payment.amount)" @change="setFormatedCurrency(payment, 'amount', null, false, $event)" :rules="[
+											isNumber,
+											(v) =>
+												!payment.mode_of_payment.toLowerCase().includes('cash') ||
+												this.is_credit_sale ||
+												v >=
+												(this.invoice_doc.rounded_total ||
+													this.invoice_doc.grand_total) ||
+												'Cash payment cannot be less than invoice total when credit sale is off',
+										]" :prefix="currencySymbol(invoice_doc.currency)" @focus="set_rest_amount(payment.idx)" :readonly="invoice_doc.is_return"></v-text-field>
+									</v-col>
+									<v-col cols="6" v-if="!is_mpesa_c2b_payment(payment)">
+										<v-btn block color="primary" theme="dark" @click="set_full_amount(payment.idx)">
+											{{ payment.mode_of_payment }}
+										</v-btn>
+									</v-col>
 
-						<!-- M-Pesa Payment Button (if payment is M-Pesa) -->
-						<v-col cols="12" v-if="is_mpesa_c2b_payment(payment)" class="pl-3">
-							<v-btn block color="success" theme="dark" @click="mpesa_c2b_dialog(payment)">
-								{{ __("Get Payments") }} {{ payment.mode_of_payment }}
-							</v-btn>
-						</v-col>
+									<!-- M-Pesa Payment Button (if payment is M-Pesa) -->
+									<v-col cols="12" v-if="is_mpesa_c2b_payment(payment)" class="pl-3">
+										<v-btn block color="success" theme="dark" @click="mpesa_c2b_dialog(payment)">
+											{{ __("Get Payments") }} {{ payment.mode_of_payment }}
+										</v-btn>
+									</v-col>
 
-						<!-- Request Payment for Phone Type -->
-						<v-col
-							cols="3"
-							v-if="payment.type === 'Phone' && payment.amount > 0 && request_payment_field"
-							class="pl-1"
-						>
-							<v-btn
-								block
-								color="success"
-								theme="dark"
-								:disabled="payment.amount === 0"
-								@click="request_payment(payment)"
-							>
-								{{ __("Request") }}
-							</v-btn>
-						</v-col>
-					</v-row>
-				</div>
+									<!-- Request Payment for Phone Type -->
+									<v-col cols="3" v-if="payment.type === 'Phone' && payment.amount > 0 && request_payment_field" class="pl-1">
+										<v-btn block color="success" theme="dark" :disabled="payment.amount === 0" @click="request_payment(payment)">
+											{{ __("Request") }}
+										</v-btn>
+									</v-col>
+								</v-row>
+							</div>
 
-				<!-- Loyalty Points Redemption -->
-				<v-row
-					class="payments pa-1"
-					v-if="invoice_doc && available_points_amount > 0 && !invoice_doc.is_return"
-				>
-					<v-col cols="7">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Redeem Loyalty Points')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatCurrency(loyalty_amount)"
-							type="text"
-							@change="setFormatedCurrency(this, 'loyalty_amount', null, false, $event)"
-							:prefix="currencySymbol(invoice_doc.currency)"
-						></v-text-field>
-					</v-col>
-					<v-col cols="5">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('You can redeem up to')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatFloat(available_points_amount)"
-							:prefix="currencySymbol(invoice_doc.currency)"
-							readonly
-						></v-text-field>
-					</v-col>
-				</v-row>
+							<!-- Loyalty Points Redemption -->
+							<v-row class="payments pa-1" v-if="invoice_doc && available_points_amount > 0 && !invoice_doc.is_return">
+								<v-col cols="7">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Redeem Loyalty Points')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(loyalty_amount)" type="text" @change="setFormatedCurrency(this, 'loyalty_amount', null, false, $event)" :prefix="currencySymbol(invoice_doc.currency)"></v-text-field>
+								</v-col>
+								<v-col cols="5">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('You can redeem up to')" class="sleek-field pos-themed-input" hide-details :model-value="formatFloat(available_points_amount)" :prefix="currencySymbol(invoice_doc.currency)" readonly></v-text-field>
+								</v-col>
+							</v-row>
 
-				<!-- Customer Credit Redemption -->
-				<v-row
-					class="payments pa-1"
-					v-if="
-						invoice_doc &&
-						available_customer_credit > 0 &&
-						!invoice_doc.is_return &&
-						redeem_customer_credit
-					"
-				>
-					<v-col cols="7">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Redeemed Customer Credit')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatCurrency(redeemed_customer_credit)"
-							type="text"
-							@change="
-								setFormatedCurrency(this, 'redeemed_customer_credit', null, false, $event)
-							"
-							:prefix="currencySymbol(invoice_doc.currency)"
-							readonly
-						></v-text-field>
-					</v-col>
-					<v-col cols="5">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('You can redeem credit up to')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatCurrency(available_customer_credit)"
-							:prefix="currencySymbol(invoice_doc.currency)"
-							readonly
-						></v-text-field>
-					</v-col>
-				</v-row>
+							<!-- Customer Credit Redemption -->
+							<v-row class="payments pa-1" v-if="
+								invoice_doc &&
+								available_customer_credit > 0 &&
+								!invoice_doc.is_return &&
+								redeem_customer_credit
+							">
+								<v-col cols="7">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Redeemed Customer Credit')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(redeemed_customer_credit)" type="text" @change="
+										setFormatedCurrency(this, 'redeemed_customer_credit', null, false, $event)
+										" :prefix="currencySymbol(invoice_doc.currency)" readonly></v-text-field>
+								</v-col>
+								<v-col cols="5">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('You can redeem credit up to')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(available_customer_credit)" :prefix="currencySymbol(invoice_doc.currency)" readonly></v-text-field>
+								</v-col>
+							</v-row>
 
-				<v-divider></v-divider>
+							<v-divider></v-divider>
 
-				<!-- Invoice Totals (Net, Tax, Total, Discount, Grand, Rounded) -->
-				<v-row class="pa-1">
-					<v-col cols="6">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Net Total')"
-							class="sleek-field pos-themed-input"
-							:model-value="formatCurrency(invoice_doc.net_total, displayCurrency)"
-							readonly
-							:prefix="currencySymbol()"
-							persistent-placeholder
-						></v-text-field>
-					</v-col>
-					<v-col cols="6">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Tax and Charges')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="
-								formatCurrency(invoice_doc.total_taxes_and_charges, displayCurrency)
-							"
-							readonly
-							:prefix="currencySymbol()"
-							persistent-placeholder
-						></v-text-field>
-					</v-col>
-					<v-col cols="6">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Total Amount')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatCurrency(invoice_doc.total, displayCurrency)"
-							readonly
-							:prefix="currencySymbol()"
-							persistent-placeholder
-						></v-text-field>
-					</v-col>
-					<v-col cols="6">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="diff_label"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatCurrency(diff_payment, displayCurrency)"
-							readonly
-							:prefix="currencySymbol()"
-							persistent-placeholder
-						></v-text-field>
-					</v-col>
-					<v-col cols="6">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Discount Amount')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatCurrency(invoice_doc.discount_amount)"
-							readonly
-							:prefix="currencySymbol(invoice_doc.currency)"
-							persistent-placeholder
-						></v-text-field>
-					</v-col>
-					<v-col cols="6">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Grand Total')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatCurrency(invoice_doc.grand_total)"
-							readonly
-							:prefix="currencySymbol(invoice_doc.currency)"
-							persistent-placeholder
-						></v-text-field>
-					</v-col>
-					<v-col v-if="invoice_doc.rounded_total" cols="6">
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Rounded Total')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							:model-value="formatCurrency(invoice_doc.rounded_total)"
-							readonly
-							:prefix="currencySymbol(invoice_doc.currency)"
-							persistent-placeholder
-						></v-text-field>
-					</v-col>
+							<!-- Invoice Totals (Net, Tax, Total, Discount, Grand, Rounded) -->
+							<v-row class="pa-1">
+								<v-col cols="6">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Net Total')" class="sleek-field pos-themed-input" :model-value="formatCurrency(invoice_doc.net_total, displayCurrency)" readonly :prefix="currencySymbol()" persistent-placeholder></v-text-field>
+								</v-col>
+								<v-col cols="6">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Tax and Charges')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(invoice_doc.total_taxes_and_charges, displayCurrency)
+										" readonly :prefix="currencySymbol()" persistent-placeholder></v-text-field>
+								</v-col>
+								<v-col cols="6">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Total Amount')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(invoice_doc.total, displayCurrency)" readonly :prefix="currencySymbol()" persistent-placeholder></v-text-field>
+								</v-col>
+								<v-col cols="6">
+									<v-text-field density="compact" variant="solo" color="primary" :label="diff_label" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(diff_payment, displayCurrency)" readonly :prefix="currencySymbol()" persistent-placeholder></v-text-field>
+								</v-col>
+								<v-col cols="6">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Discount Amount')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(invoice_doc.discount_amount)" readonly :prefix="currencySymbol(invoice_doc.currency)" persistent-placeholder></v-text-field>
+								</v-col>
+								<v-col cols="6">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Grand Total')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(invoice_doc.grand_total)" readonly :prefix="currencySymbol(invoice_doc.currency)" persistent-placeholder></v-text-field>
+								</v-col>
+								<v-col v-if="invoice_doc.rounded_total" cols="6">
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Rounded Total')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(invoice_doc.rounded_total)" readonly :prefix="currencySymbol(invoice_doc.currency)" persistent-placeholder></v-text-field>
+								</v-col>
 
-					<!-- Delivery Date and Address (if applicable) -->
-					<v-col cols="6" v-if="pos_profile.posa_allow_sales_order && invoiceType === 'Order'">
-						<VueDatePicker
-							v-model="new_delivery_date"
-							model-type="format"
-							format="dd-MM-yyyy"
-							:min-date="new Date()"
-							auto-apply
-							class="sleek-field pos-themed-input"
-							@update:model-value="update_delivery_date()"
-						/>
-					</v-col>
-					<!-- Shipping Address Selection (if delivery date is set) -->
-					<v-col cols="12" v-if="invoice_doc.posa_delivery_date">
-						<v-autocomplete
-							density="compact"
-							clearable
-							auto-select-first
-							variant="solo"
-							color="primary"
-							:label="frappe._('Address')"
-							v-model="invoice_doc.shipping_address_name"
-							:items="addresses"
-							item-title="address_title"
-							item-value="name"
-							class="sleek-field pos-themed-input"
-							:no-data-text="__('Address not found')"
-							hide-details
-							:customFilter="addressFilter"
-							append-icon="mdi-plus"
-							@click:append="new_address"
-						>
-							<template v-slot:item="{ item }">
-								<v-list-item>
-									<v-list-item-title class="text-primary text-subtitle-1">
-										<div v-html="item.address_title"></div>
-									</v-list-item-title>
-									<v-list-item-subtitle>
-										<div v-html="item.address_line1"></div>
-									</v-list-item-subtitle>
-									<v-list-item-subtitle v-if="item.address_line2">
-										<div v-html="item.address_line2"></div>
-									</v-list-item-subtitle>
-									<v-list-item-subtitle v-if="item.city">
-										<div v-html="item.city"></div>
-									</v-list-item-subtitle>
-									<v-list-item-subtitle v-if="item.state">
-										<div v-html="item.state"></div>
-									</v-list-item-subtitle>
-									<v-list-item-subtitle v-if="item.country">
-										<div v-html="item.country"></div>
-									</v-list-item-subtitle>
-									<v-list-item-subtitle v-if="item.mobile_no">
-										<div v-html="item.mobile_no"></div>
-									</v-list-item-subtitle>
-									<v-list-item-subtitle v-if="item.address_type">
-										<div v-html="item.address_type"></div>
-									</v-list-item-subtitle>
-								</v-list-item>
-							</template>
-						</v-autocomplete>
-					</v-col>
+								<!-- Delivery Date and Address (if applicable) -->
+								<v-col cols="6" v-if="pos_profile.posa_allow_sales_order && invoiceType === 'Order'">
+									<VueDatePicker v-model="new_delivery_date" model-type="format" format="dd-MM-yyyy" :min-date="new Date()" auto-apply class="sleek-field pos-themed-input" @update:model-value="update_delivery_date()" />
+								</v-col>
+								<!-- Shipping Address Selection (if delivery date is set) -->
+								<v-col cols="12" v-if="invoice_doc.posa_delivery_date">
+									<v-autocomplete density="compact" clearable auto-select-first variant="solo" color="primary" :label="frappe._('Address')" v-model="invoice_doc.shipping_address_name" :items="addresses" item-title="address_title" item-value="name" class="sleek-field pos-themed-input" :no-data-text="__('Address not found')" hide-details :customFilter="addressFilter" append-icon="mdi-plus" @click:append="new_address">
+										<template v-slot:item="{ item }">
+											<v-list-item>
+												<v-list-item-title class="text-primary text-subtitle-1">
+													<div v-html="item.address_title"></div>
+												</v-list-item-title>
+												<v-list-item-subtitle>
+													<div v-html="item.address_line1"></div>
+												</v-list-item-subtitle>
+												<v-list-item-subtitle v-if="item.address_line2">
+													<div v-html="item.address_line2"></div>
+												</v-list-item-subtitle>
+												<v-list-item-subtitle v-if="item.city">
+													<div v-html="item.city"></div>
+												</v-list-item-subtitle>
+												<v-list-item-subtitle v-if="item.state">
+													<div v-html="item.state"></div>
+												</v-list-item-subtitle>
+												<v-list-item-subtitle v-if="item.country">
+													<div v-html="item.country"></div>
+												</v-list-item-subtitle>
+												<v-list-item-subtitle v-if="item.mobile_no">
+													<div v-html="item.mobile_no"></div>
+												</v-list-item-subtitle>
+												<v-list-item-subtitle v-if="item.address_type">
+													<div v-html="item.address_type"></div>
+												</v-list-item-subtitle>
+											</v-list-item>
+										</template>
+									</v-autocomplete>
+								</v-col>
 
-					<!-- Additional Notes (if enabled in POS profile) -->
-					<v-col cols="12" v-if="pos_profile.posa_display_additional_notes">
-						<v-textarea
-							class="pa-0 sleek-field"
-							variant="solo"
-							density="compact"
-							clearable
-							color="primary"
-							auto-grow
-							rows="2"
-							:label="frappe._('Additional Notes')"
-							v-model="invoice_doc.posa_notes"
-						></v-textarea>
-					</v-col>
-				</v-row>
+								<!-- Additional Notes (if enabled in POS profile) -->
+								<v-col cols="12" v-if="pos_profile.posa_display_additional_notes">
+									<v-textarea class="pa-0 sleek-field" variant="solo" density="compact" clearable color="primary" auto-grow rows="2" :label="frappe._('Additional Notes')" v-model="invoice_doc.posa_notes"></v-textarea>
+								</v-col>
+							</v-row>
 
-				<!-- Customer Purchase Order (if enabled in POS profile) -->
-				<div v-if="pos_profile.posa_allow_customer_purchase_order">
-					<v-divider></v-divider>
-					<v-row class="pa-1" justify="center" align="start">
-						<v-col cols="6">
-							<v-text-field
-								v-model="invoice_doc.po_no"
-								:label="frappe._('Purchase Order')"
-								variant="solo"
-								density="compact"
-								class="sleek-field pos-themed-input"
-								clearable
-								color="primary"
-								hide-details
-							></v-text-field>
-						</v-col>
-						<v-col cols="6">
-							<VueDatePicker
-								v-model="new_po_date"
-								model-type="format"
-								format="dd-MM-yyyy"
-								:min-date="new Date()"
-								auto-apply
-								class="sleek-field pos-themed-input"
-								@update:model-value="update_po_date()"
-							/>
-							<v-text-field
-								v-model="invoice_doc.po_date"
-								:label="frappe._('Purchase Order Date')"
-								readonly
-								variant="solo"
-								density="compact"
-								hide-details
-								color="primary"
-							></v-text-field>
-						</v-col>
-					</v-row>
-				</div>
+							<!-- Customer Purchase Order (if enabled in POS profile) -->
+							<div v-if="pos_profile.posa_allow_customer_purchase_order">
+								<v-divider></v-divider>
+								<v-row class="pa-1" justify="center" align="start">
+									<v-col cols="6">
+										<v-text-field v-model="invoice_doc.po_no" :label="frappe._('Purchase Order')" variant="solo" density="compact" class="sleek-field pos-themed-input" clearable color="primary" hide-details></v-text-field>
+									</v-col>
+									<v-col cols="6">
+										<VueDatePicker v-model="new_po_date" model-type="format" format="dd-MM-yyyy" :min-date="new Date()" auto-apply class="sleek-field pos-themed-input" @update:model-value="update_po_date()" />
+										<v-text-field v-model="invoice_doc.po_date" :label="frappe._('Purchase Order Date')" readonly variant="solo" density="compact" hide-details color="primary"></v-text-field>
+									</v-col>
+								</v-row>
+							</div>
 
-				<v-divider></v-divider>
+							<v-divider></v-divider>
 
-				<!-- Switches for Write Off and Credit Sale -->
-				<v-row class="pa-1" align="start" no-gutters>
-					<v-col
-						cols="6"
-						v-if="
-							pos_profile.posa_allow_write_off_change &&
-							credit_change > 0 &&
-							!invoice_doc.is_return
-						"
-					>
-						<v-switch
-							v-model="is_write_off_change"
-							flat
-							:label="frappe._('Write Off Difference Amount')"
-							class="my-0 pa-1"
-						></v-switch>
-					</v-col>
-					<v-col cols="6" v-if="pos_profile.posa_allow_credit_sale && !invoice_doc.is_return">
-						<v-switch v-model="is_credit_sale" :label="frappe._('Credit Sale?')"></v-switch>
-					</v-col>
-					<v-col cols="6" v-if="invoice_doc.is_return && pos_profile.use_cashback">
-						<v-switch
-							v-model="is_cashback"
-							flat
-							:label="frappe._('Cashback?')"
-							class="my-0 pa-1"
-						></v-switch>
-					</v-col>
-					<v-col cols="6" v-if="invoice_doc.is_return">
-						<v-switch
-							v-model="is_credit_return"
-							flat
-							:label="frappe._('Credit Return?')"
-							class="my-0 pa-1"
-						></v-switch>
-					</v-col>
-					<v-col cols="6" v-if="is_credit_sale">
-						<VueDatePicker
-							v-model="new_credit_due_date"
-							model-type="format"
-							format="dd-MM-yyyy"
-							:min-date="new Date()"
-							auto-apply
-							class="sleek-field pos-themed-input"
-							@update:model-value="update_credit_due_date()"
-						/>
-						<v-text-field
-							class="mt-2 sleek-field"
-							density="compact"
-							variant="solo"
-							type="number"
-							min="0"
-							max="365"
-							v-model.number="credit_due_days"
-							:label="frappe._('Days until due')"
-							hide-details
-							@change="applyDuePreset(credit_due_days)"
-						></v-text-field>
-						<div class="mt-1">
-							<v-chip
-								v-for="d in credit_due_presets"
-								:key="d"
-								size="small"
-								class="ma-1"
-								variant="solo"
-								color="primary"
-								@click="applyDuePreset(d)"
-							>
-								{{ d }} {{ frappe._("days") }}
-							</v-chip>
+							<!-- Switches for Write Off and Credit Sale -->
+							<v-row class="pa-1" align="start" no-gutters>
+								<v-col cols="6" v-if="
+									pos_profile.posa_allow_write_off_change &&
+									credit_change > 0 &&
+									!invoice_doc.is_return
+								">
+									<v-switch v-model="is_write_off_change" flat :label="frappe._('Write Off Difference Amount')" class="my-0 pa-1"></v-switch>
+								</v-col>
+								<v-col cols="6" v-if="pos_profile.posa_allow_credit_sale && !invoice_doc.is_return">
+									<v-switch v-model="is_credit_sale" :label="frappe._('Credit Sale?')"></v-switch>
+								</v-col>
+								<v-col cols="6" v-if="invoice_doc.is_return && pos_profile.use_cashback">
+									<v-switch v-model="is_cashback" flat :label="frappe._('Cashback?')" class="my-0 pa-1"></v-switch>
+								</v-col>
+								<v-col cols="6" v-if="invoice_doc.is_return">
+									<v-switch v-model="is_credit_return" flat :label="frappe._('Credit Return?')" class="my-0 pa-1"></v-switch>
+								</v-col>
+								<v-col cols="6" v-if="is_credit_sale">
+									<VueDatePicker v-model="new_credit_due_date" model-type="format" format="dd-MM-yyyy" :min-date="new Date()" auto-apply class="sleek-field pos-themed-input" @update:model-value="update_credit_due_date()" />
+									<v-text-field class="mt-2 sleek-field" density="compact" variant="solo" type="number" min="0" max="365" v-model.number="credit_due_days" :label="frappe._('Days until due')" hide-details @change="applyDuePreset(credit_due_days)"></v-text-field>
+									<div class="mt-1">
+										<v-chip v-for="d in credit_due_presets" :key="d" size="small" class="ma-1" variant="solo" color="primary" @click="applyDuePreset(d)">
+											{{ d }} {{ frappe._("days") }}
+										</v-chip>
+									</div>
+								</v-col>
+								<v-col cols="6" v-if="!invoice_doc.is_return && pos_profile.use_customer_credit">
+									<v-switch v-model="redeem_customer_credit" flat :label="frappe._('Use Customer Credit')" class="my-0 pa-1" @update:model-value="get_available_credit(redeem_customer_credit)"></v-switch>
+								</v-col>
+							</v-row>
+
+							<!-- Customer Credit Details -->
+							<div v-if="
+								invoice_doc &&
+								available_customer_credit > 0 &&
+								!invoice_doc.is_return &&
+								redeem_customer_credit
+							">
+								<v-row v-for="(row, idx) in customer_credit_dict" :key="idx">
+									<v-col cols="4">
+										<div class="pa-2 py-3">{{ row.credit_origin }}</div>
+									</v-col>
+									<v-col cols="4">
+										<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Available Credit')" class="sleek-field pos-themed-input" hide-details :model-value="formatCurrency(row.total_credit)" readonly :prefix="currencySymbol(invoice_doc.currency)"></v-text-field>
+									</v-col>
+									<v-col cols="4">
+										<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Redeem Credit')" class="sleek-field pos-themed-input" hide-details type="text" :model-value="formatCurrency(row.credit_to_redeem)" @change="setFormatedCurrency(row, 'credit_to_redeem', null, false, $event)" :prefix="currencySymbol(invoice_doc.currency)"></v-text-field>
+									</v-col>
+								</v-row>
+							</div>
+
+							<v-divider></v-divider>
+
+							<!-- Sales Person Selection -->
+							<v-row class="pb-0 mb-2" align="start">
+								<v-col cols="12">
+									<p v-if="sales_persons && sales_persons.length > 0" class="mt-1 mb-1 text-subtitle-2">
+										{{ sales_persons.length }} sales persons found
+									</p>
+									<p v-else class="mt-1 mb-1 text-subtitle-2 text-red">No sales persons found</p>
+									<v-select density="compact" clearable variant="solo" color="primary" :label="frappe._('Sales Person')" v-model="sales_person" :items="sales_persons" item-title="title" item-value="value" class="sleek-field pos-themed-input" :no-data-text="__('Sales Person not found')" hide-details :disabled="readonly"></v-select>
+								</v-col>
+							</v-row>
 						</div>
-					</v-col>
-					<v-col cols="6" v-if="!invoice_doc.is_return && pos_profile.use_customer_credit">
-						<v-switch
-							v-model="redeem_customer_credit"
-							flat
-							:label="frappe._('Use Customer Credit')"
-							class="my-0 pa-1"
-							@update:model-value="get_available_credit(redeem_customer_credit)"
-						></v-switch>
-					</v-col>
-				</v-row>
+					</v-card>
 
-				<!-- Customer Credit Details -->
-				<div
-					v-if="
-						invoice_doc &&
-						available_customer_credit > 0 &&
-						!invoice_doc.is_return &&
-						redeem_customer_credit
-					"
-				>
-					<v-row v-for="(row, idx) in customer_credit_dict" :key="idx">
-						<v-col cols="4">
-							<div class="pa-2 py-3">{{ row.credit_origin }}</div>
-						</v-col>
-						<v-col cols="4">
-							<v-text-field
-								density="compact"
-								variant="solo"
-								color="primary"
-								:label="frappe._('Available Credit')"
-								class="sleek-field pos-themed-input"
-								hide-details
-								:model-value="formatCurrency(row.total_credit)"
-								readonly
-								:prefix="currencySymbol(invoice_doc.currency)"
-							></v-text-field>
-						</v-col>
-						<v-col cols="4">
-							<v-text-field
-								density="compact"
-								variant="solo"
-								color="primary"
-								:label="frappe._('Redeem Credit')"
-								class="sleek-field pos-themed-input"
-								hide-details
-								type="text"
-								:model-value="formatCurrency(row.credit_to_redeem)"
-								@change="setFormatedCurrency(row, 'credit_to_redeem', null, false, $event)"
-								:prefix="currencySymbol(invoice_doc.currency)"
-							></v-text-field>
-						</v-col>
-					</v-row>
-				</div>
+					<!-- Action Buttons -->
+					<v-card flat class="cards mb-0 mt-3 pa-0">
+						<v-row align="start" no-gutters>
+							<v-col cols="6">
+								<v-btn ref="submitButton" block size="large" color="primary" theme="dark" class="submit-btn" @click="submit" :loading="loading" :disabled="loading || vaildatPayment" :class="{ 'submit-highlight': highlightSubmit }">
+									{{ __("Submit") }}
+								</v-btn>
+							</v-col>
+							<v-col cols="6" class="pl-1">
+								<v-btn block size="large" color="success" theme="dark" @click="submit(undefined, false, true)" :loading="loading" :disabled="loading || vaildatPayment">
+									{{ __("Submit & Print") }}
+								</v-btn>
+							</v-col>
+							<v-col cols="12">
+								<v-btn block class="mt-2 pa-1" size="large" color="error" theme="dark" @click="back_to_invoice">
+									{{ __("Cancel Payment") }}
+								</v-btn>
+							</v-col>
+						</v-row>
+					</v-card>
+					<!-- Custom Days Dialog -->
+					<v-dialog v-model="custom_days_dialog" max-width="300px">
+						<v-card>
+							<v-card-title class="text-h6">
+								{{ __("Custom Due Days") }}
+							</v-card-title>
+							<v-card-text class="pa-0">
+								<v-container>
+									<v-text-field density="compact" variant="solo" type="number" min="0" max="365" class="sleek-field pos-themed-input" v-model.number="custom_days_value" :label="frappe._('Days')" hide-details></v-text-field>
+								</v-container>
+							</v-card-text>
+							<v-card-actions>
+								<v-spacer></v-spacer>
+								<v-btn color="error" theme="dark" @click="custom_days_dialog = false">
+									{{ __("Close") }}
+								</v-btn>
+								<v-btn color="primary" theme="dark" @click="applyCustomDays">
+									{{ __("Apply") }}
+								</v-btn>
+							</v-card-actions>
+						</v-card>
+					</v-dialog>
 
-				<v-divider></v-divider>
-
-				<!-- Sales Person Selection -->
-				<v-row class="pb-0 mb-2" align="start">
-					<v-col cols="12">
-						<p v-if="sales_persons && sales_persons.length > 0" class="mt-1 mb-1 text-subtitle-2">
-							{{ sales_persons.length }} sales persons found
-						</p>
-						<p v-else class="mt-1 mb-1 text-subtitle-2 text-red">No sales persons found</p>
-						<v-select
-							density="compact"
-							clearable
-							variant="solo"
-							color="primary"
-							:label="frappe._('Sales Person')"
-							v-model="sales_person"
-							:items="sales_persons"
-							item-title="title"
-							item-value="value"
-							class="sleek-field pos-themed-input"
-							:no-data-text="__('Sales Person not found')"
-							hide-details
-							:disabled="readonly"
-						></v-select>
-					</v-col>
-				</v-row>
-			</div>
-		</v-card>
-
-		<!-- Action Buttons -->
-		<v-card flat class="cards mb-0 mt-3 pa-0">
-			<v-row align="start" no-gutters>
-				<v-col cols="6">
-					<v-btn
-						ref="submitButton"
-						block
-						size="large"
-						color="primary"
-						theme="dark"
-						class="submit-btn"
-						@click="submit"
-						:loading="loading"
-						:disabled="loading || vaildatPayment"
-						:class="{ 'submit-highlight': highlightSubmit }"
-					>
-						{{ __("Submit") }}
-					</v-btn>
-				</v-col>
-				<v-col cols="6" class="pl-1">
-					<v-btn
-						block
-						size="large"
-						color="success"
-						theme="dark"
-						@click="submit(undefined, false, true)"
-						:loading="loading"
-						:disabled="loading || vaildatPayment"
-					>
-						{{ __("Submit & Print") }}
-					</v-btn>
-				</v-col>
-				<v-col cols="12">
-					<v-btn
-						block
-						class="mt-2 pa-1"
-						size="large"
-						color="error"
-						theme="dark"
-						@click="back_to_invoice"
-					>
-						{{ __("Cancel Payment") }}
-					</v-btn>
-				</v-col>
-			</v-row>
-		</v-card>
-		<!-- Custom Days Dialog -->
-		<v-dialog v-model="custom_days_dialog" max-width="300px">
-			<v-card>
-				<v-card-title class="text-h6">
-					{{ __("Custom Due Days") }}
-				</v-card-title>
-				<v-card-text class="pa-0">
-					<v-container>
-						<v-text-field
-							density="compact"
-							variant="solo"
-							type="number"
-							min="0"
-							max="365"
-							class="sleek-field pos-themed-input"
-							v-model.number="custom_days_value"
-							:label="frappe._('Days')"
-							hide-details
-						></v-text-field>
-					</v-container>
-				</v-card-text>
-				<v-card-actions>
-					<v-spacer></v-spacer>
-					<v-btn color="error" theme="dark" @click="custom_days_dialog = false">
-						{{ __("Close") }}
-					</v-btn>
-					<v-btn color="primary" theme="dark" @click="applyCustomDays">
-						{{ __("Apply") }}
-					</v-btn>
-				</v-card-actions>
-			</v-card>
-		</v-dialog>
-
-		<!-- Phone Payment Dialog -->
-		<v-dialog v-model="phone_dialog" max-width="400px">
-			<v-card>
-				<v-card-title>
-					<span class="text-h5 text-primary">{{ __("Confirm Mobile Number") }}</span>
-				</v-card-title>
-				<v-card-text class="pa-0">
-					<v-container>
-						<v-text-field
-							density="compact"
-							variant="solo"
-							color="primary"
-							:label="frappe._('Mobile Number')"
-							class="sleek-field pos-themed-input"
-							hide-details
-							v-model="invoice_doc.contact_mobile"
-							type="number"
-						></v-text-field>
-					</v-container>
-				</v-card-text>
-				<v-card-actions>
-					<v-spacer></v-spacer>
-					<v-btn color="error" theme="dark" @click="phone_dialog = false">
-						{{ __("Close") }}
-					</v-btn>
-					<v-btn color="primary" theme="dark" @click="request_payment">
-						{{ __("Request") }}
-					</v-btn>
-				</v-card-actions>
-			</v-card>
-		</v-dialog>
+					<!-- Phone Payment Dialog -->
+					<v-dialog v-model="phone_dialog" max-width="400px">
+						<v-card>
+							<v-card-title>
+								<span class="text-h5 text-primary">{{ __("Confirm Mobile Number") }}</span>
+							</v-card-title>
+							<v-card-text class="pa-0">
+								<v-container>
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Mobile Number')" class="sleek-field pos-themed-input" hide-details v-model="invoice_doc.contact_mobile" type="number"></v-text-field>
+								</v-container>
+							</v-card-text>
+							<v-card-actions>
+								<v-spacer></v-spacer>
+								<v-btn color="error" theme="dark" @click="phone_dialog = false">
+									{{ __("Close") }}
+								</v-btn>
+								<v-btn color="primary" theme="dark" @click="request_payment">
+									{{ __("Request") }}
+								</v-btn>
+							</v-card-actions>
+						</v-card>
+					</v-dialog>
 				</div>
 			</v-card-text>
 		</v-card>
@@ -1245,7 +839,7 @@ export default {
 			if (
 				!this.invoice_doc.is_return &&
 				this.redeemed_customer_credit >
-					(this.invoice_doc.rounded_total || this.invoice_doc.grand_total)
+				(this.invoice_doc.rounded_total || this.invoice_doc.grand_total)
 			) {
 				this.eventBus.emit("show_message", {
 					title: `Cannot redeem customer credit more than invoice total`,

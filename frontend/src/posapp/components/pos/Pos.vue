@@ -1,9 +1,5 @@
 <template>
-	<div
-		class="pos-main-container dynamic-container"
-		:class="rtlClasses"
-		:style="[responsiveStyles, rtlStyles]"
-	>
+	<div class="pos-main-container dynamic-container" :class="rtlClasses" :style="[responsiveStyles, rtlStyles]">
 		<ClosingDialog></ClosingDialog>
 		<Drafts></Drafts>
 		<SalesOrders></SalesOrders>
@@ -12,11 +8,6 @@
 		<MpesaPayments></MpesaPayments>
 		<Variants></Variants>
 		<OpeningDialog v-if="dialog" :dialog="dialog"></OpeningDialog>
-		<!-- Floating ItemsSelector trigger button -->
-		<div class="items-selector-trigger">
-			<ItemsSelector></ItemsSelector>
-		</div>
-
 		<v-row v-show="!dialog" dense class="ma-0 dynamic-main-row">
 			<v-col v-show="showOffers" xl="5" lg="5" md="5" sm="5" cols="12" class="pos dynamic-col">
 				<PosOffers></PosOffers>
@@ -25,14 +16,7 @@
 				<PosCoupons></PosCoupons>
 			</v-col>
 
-			<v-col
-				:xl="showOffers || coupons ? 7 : 12"
-				:lg="showOffers || coupons ? 7 : 12"
-				:md="showOffers || coupons ? 7 : 12"
-				:sm="showOffers || coupons ? 7 : 12"
-				cols="12"
-				class="pos dynamic-col"
-			>
+			<v-col :xl="showOffers || coupons ? 7 : 12" :lg="showOffers || coupons ? 7 : 12" :md="showOffers || coupons ? 7 : 12" :sm="showOffers || coupons ? 7 : 12" cols="12" class="pos dynamic-col">
 				<Invoice></Invoice>
 			</v-col>
 		</v-row>
@@ -43,7 +27,6 @@
 </template>
 
 <script>
-import ItemsSelector from "./ItemsSelector.vue";
 import Invoice from "./Invoice.vue";
 import OpeningDialog from "./OpeningDialog.vue";
 import Payments from "./Payments.vue";
@@ -98,7 +81,6 @@ export default {
 	},
 
 	components: {
-		ItemsSelector,
 		Invoice,
 		OpeningDialog,
 		Payments,
@@ -204,6 +186,14 @@ export default {
 </script>
 
 <style scoped>
+.pos-main-container {
+	min-height: 100vh;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
 .dynamic-container {
 	/* add space for the navbar with better spacing */
 	/*padding-top: calc(25px + var(--dynamic-lg));*/
@@ -211,24 +201,18 @@ export default {
 	transition: all 0.3s ease;
 }
 
-.items-selector-trigger {
-	position: fixed;
-	top: 20px;
-	right: 20px;
-	z-index: 100;
-	pointer-events: none;
-}
-
-.items-selector-trigger > * {
-	pointer-events: auto;
-}
-
 .dynamic-main-row {
+	flex: 1 1 auto;
+	overflow: hidden;
+	min-height: 0;
 	padding: 0;
 	margin: 0;
 }
 
 .dynamic-col {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
 	padding: var(--dynamic-sm);
 	transition: padding 0.3s ease;
 	margin-top: var(--dynamic-sm);

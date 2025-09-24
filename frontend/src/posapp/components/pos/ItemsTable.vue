@@ -1,50 +1,9 @@
 <template>
-	<div
-		ref="tableContainer"
-		class="my-0 py-0 overflow-y-auto items-table-container responsive-table-container pos-themed-card"
-		:style="containerStyles"
-		:class="containerClasses"
-		@dragover="onDragOverFromSelector($event)"
-		@drop="onDropFromSelector($event)"
-		@dragenter="onDragEnterFromSelector"
-		@dragleave="onDragLeaveFromSelector"
-	>
-		<v-data-table
-			:headers="responsiveHeaders"
-			:items="items"
-			:expanded="expanded"
-			show-expand
-			item-value="posa_row_id"
-			class="pos-table elevation-2 pos-themed-card"
-			:class="tableClasses"
-			:items-per-page="itemsPerPage || -1"
-			expand-on-click
-			:density="tableDensity"
-			hide-default-footer
-			:single-expand="true"
-			:header-props="dynamicHeaderProps"
-			:no-data-text="__('No items in cart')"
-			@update:expanded="handleExpandedUpdate"
-			:search="itemSearch"
-			:custom-filter="customItemFilter"
-		>
+	<div ref="tableContainer" class="my-0 py-0 overflow-y-auto items-table-container responsive-table-container pos-themed-card" :style="containerStyles" :class="containerClasses" @dragover="onDragOverFromSelector($event)" @drop="onDropFromSelector($event)" @dragenter="onDragEnterFromSelector" @dragleave="onDragLeaveFromSelector">
+		<v-data-table :headers="responsiveHeaders" :items="items" :expanded="expanded" show-expand item-value="posa_row_id" class="pos-table elevation-2 pos-themed-card" :class="tableClasses" :items-per-page="itemsPerPage || -1" expand-on-click :density="tableDensity" hide-default-footer :single-expand="true" :header-props="dynamicHeaderProps" :no-data-text="__('No items in cart')" @update:expanded="handleExpandedUpdate" :search="itemSearch" :custom-filter="customItemFilter">
 			<!-- UOM column -->
 			<template v-slot:item.uom="{ item }">
-				<v-select
-					density="compact"
-					variant="outlined"
-					class="pos-themed-input table-uom-select"
-					v-model="item.uom"
-					:items="item.item_uoms"
-					item-title="uom"
-					item-value="uom"
-					hide-details
-					@update:model-value="calcUom(item, $event)"
-					@click.stop
-					@mousedown.stop
-					:disabled="!!item.posa_is_replace || (isReturnInvoice && invoice_doc.return_against)"
-					prepend-inner-icon="mdi-weight"
-				></v-select>
+				<v-select density="compact" variant="outlined" class="pos-themed-input table-uom-select" v-model="item.uom" :items="item.item_uoms" item-title="uom" item-value="uom" hide-details @update:model-value="calcUom(item, $event)" @click.stop @mousedown.stop :disabled="!!item.posa_is_replace || (isReturnInvoice && invoice_doc.return_against)" prepend-inner-icon="mdi-weight"></v-select>
 			</template>
 
 			<!-- Item name column -->
@@ -57,58 +16,28 @@
 					<v-chip v-if="item.name_overridden" color="primary" size="x-small" class="ml-1">{{
 						__("Edited")
 					}}</v-chip>
-					<v-icon
-						v-if="pos_profile.posa_allow_line_item_name_override && !item.posa_is_replace"
-						size="x-small"
-						class="ml-1"
-						@click.stop="openNameDialog(item)"
-						>mdi-pencil</v-icon
-					>
-					<v-icon
-						v-if="item.name_overridden"
-						size="x-small"
-						class="ml-1"
-						@click.stop="resetItemName(item)"
-						>mdi-undo</v-icon
-					>
+					<v-icon v-if="pos_profile.posa_allow_line_item_name_override && !item.posa_is_replace" size="x-small" class="ml-1" @click.stop="openNameDialog(item)">mdi-pencil</v-icon>
+					<v-icon v-if="item.name_overridden" size="x-small" class="ml-1" @click.stop="resetItemName(item)">mdi-undo</v-icon>
 				</div>
 			</template>
 
 			<!-- Quantity column -->
 			<template v-slot:item.qty="{ item }">
 				<div class="pos-table__qty-counter" :class="{ 'rtl-layout': isRTL }" :title="`RTL: ${isRTL}`">
-					<v-btn
-						:disabled="!!item.posa_is_replace"
-						size="small"
-						variant="flat"
-						class="pos-table__qty-btn pos-table__qty-btn--minus"
-						@click.stop="handleMinusClick(item)"
-					>
+					<v-btn :disabled="!!item.posa_is_replace" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--minus" @click.stop="handleMinusClick(item)">
 						<v-icon size="small">mdi-minus</v-icon>
 					</v-btn>
-					<div
-						class="pos-table__qty-display amount-value number-field-rtl"
-						:class="{
-							'negative-number': isNegative(item.qty),
-							'large-number': memoizedQtyLength(item.qty) > 6,
-						}"
-						:data-length="memoizedQtyLength(item.qty)"
-						:title="formatFloat(item.qty, hide_qty_decimals ? 0 : undefined)"
-					>
+					<div class="pos-table__qty-display amount-value number-field-rtl" :class="{
+						'negative-number': isNegative(item.qty),
+						'large-number': memoizedQtyLength(item.qty) > 6,
+					}" :data-length="memoizedQtyLength(item.qty)" :title="formatFloat(item.qty, hide_qty_decimals ? 0 : undefined)">
 						{{ formatFloat(item.qty, hide_qty_decimals ? 0 : undefined) }}
 					</div>
-					<v-btn
-						:disabled="
-							!!item.posa_is_replace ||
-							((!stock_settings.allow_negative_stock || blockSaleBeyondAvailableQty) &&
-								item.max_qty !== undefined &&
-								item.qty >= item.max_qty)
-						"
-						size="small"
-						variant="flat"
-						class="pos-table__qty-btn pos-table__qty-btn--plus"
-						@click.stop="addOne(item)"
-					>
+					<v-btn :disabled="!!item.posa_is_replace ||
+						((!stock_settings.allow_negative_stock || blockSaleBeyondAvailableQty) &&
+							item.max_qty !== undefined &&
+							item.qty >= item.max_qty)
+						" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--plus" @click.stop="addOne(item)">
 						<v-icon size="small">mdi-plus</v-icon>
 					</v-btn>
 				</div>
@@ -128,27 +57,21 @@
 			<template v-slot:item.amount="{ item }">
 				<div class="currency-display right-aligned">
 					<span class="currency-symbol">{{ currencySymbol(displayCurrency) }}</span>
-					<span
-						class="amount-value"
-						:class="{ 'negative-number': isNegative(item.qty * item.rate) }"
-						>{{ formatCurrency(item.qty * item.rate) }}</span
-					>
+					<span class="amount-value" :class="{ 'negative-number': isNegative(item.qty * item.rate) }">{{ formatCurrency(item.qty * item.rate) }}</span>
 				</div>
 			</template>
 
 			<!-- Discount percentage column -->
 			<template v-slot:item.discount_value="{ item }">
 				<div class="currency-display right-aligned">
-					<span class="amount-value"
-						>{{
-							formatFloat(
-								item.discount_percentage ||
-									(item.price_list_rate
-										? (item.discount_amount / item.price_list_rate) * 100
-										: 0),
-							)
-						}}%</span
-					>
+					<span class="amount-value">{{
+						formatFloat(
+							item.discount_percentage ||
+							(item.price_list_rate
+								? (item.discount_amount / item.price_list_rate) * 100
+								: 0),
+						)
+					}}%</span>
 				</div>
 			</template>
 
@@ -156,11 +79,7 @@
 			<template v-slot:item.discount_amount="{ item }">
 				<div class="currency-display right-aligned">
 					<span class="currency-symbol">{{ currencySymbol(displayCurrency) }}</span>
-					<span
-						class="amount-value"
-						:class="{ 'negative-number': isNegative(item.discount_amount || 0) }"
-						>{{ formatCurrency(item.discount_amount || 0) }}</span
-					>
+					<span class="amount-value" :class="{ 'negative-number': isNegative(item.discount_amount || 0) }">{{ formatCurrency(item.discount_amount || 0) }}</span>
 				</div>
 			</template>
 
@@ -168,35 +87,19 @@
 			<template v-slot:item.price_list_rate="{ item }">
 				<div class="currency-display right-aligned">
 					<span class="currency-symbol">{{ currencySymbol(displayCurrency) }}</span>
-					<span
-						class="amount-value"
-						:class="{ 'negative-number': isNegative(item.price_list_rate) }"
-						>{{ formatCurrency(item.price_list_rate) }}</span
-					>
+					<span class="amount-value" :class="{ 'negative-number': isNegative(item.price_list_rate) }">{{ formatCurrency(item.price_list_rate) }}</span>
 				</div>
 			</template>
 
 			<!-- Offer toggle button column -->
 			<template v-slot:item.posa_is_offer="{ item }">
-				<v-btn
-					size="x-small"
-					color="primary"
-					variant="tonal"
-					class="ma-0 pa-0"
-					@click.stop="toggleOffer(item)"
-				>
+				<v-btn size="x-small" color="primary" variant="tonal" class="ma-0 pa-0" @click.stop="toggleOffer(item)">
 					{{ item.posa_offer_applied ? __("Remove Offer") : __("Apply Offer") }}
 				</v-btn>
 			</template>
 			<!-- Actions column -->
 			<template v-slot:item.actions="{ item }">
-				<v-btn
-					:disabled="!!item.posa_is_replace"
-					size="small"
-					variant="flat"
-					class="pos-table__delete-btn"
-					@click.stop="removeItem(item)"
-				>
+				<v-btn :disabled="!!item.posa_is_replace" size="small" variant="flat" class="pos-table__delete-btn" @click.stop="removeItem(item)">
 					<v-icon size="small">mdi-delete-outline</v-icon>
 				</v-btn>
 			</template>
@@ -337,7 +240,7 @@
 												<v-list-item-title v-html="item.raw.batch_no"></v-list-item-title>
 												<v-list-item-subtitle v-html="`Available QTY  '${item.raw.batch_qty}' - Expiry Date ${item.raw.expiry_date}`"></v-list-item-subtitle>
 											</v-list-item>
-									</template>
+										</template>
 									</v-autocomplete>
 								</div>
 							</div>
@@ -370,12 +273,7 @@
 					<v-text-field v-model="editedName" :maxlength="140" />
 				</v-card-text>
 				<v-card-actions>
-					<v-btn
-						v-if="editNameTarget && editNameTarget.name_overridden"
-						variant="text"
-						@click="resetItemName(editNameTarget)"
-						>{{ __("Reset") }}</v-btn
-					>
+					<v-btn v-if="editNameTarget && editNameTarget.name_overridden" variant="text" @click="resetItemName(editNameTarget)">{{ __("Reset") }}</v-btn>
 					<v-spacer></v-spacer>
 					<v-btn variant="text" @click="editNameDialog = false">{{ __("Cancel") }}</v-btn>
 					<v-btn color="primary" variant="text" @click="saveItemName">{{ __("Save") }}</v-btn>
@@ -1125,7 +1023,7 @@ export default {
 }
 
 /* Ensure all cell contents fill the cell */
-.pos-table :deep(td) > div {
+.pos-table :deep(td)>div {
 	width: 100%;
 	height: 100%;
 	display: flex;
@@ -1189,9 +1087,11 @@ export default {
 	0% {
 		transform: translateX(-100%);
 	}
+
 	50% {
 		transform: translateX(100%);
 	}
+
 	100% {
 		transform: translateX(100%);
 	}
@@ -1202,6 +1102,7 @@ export default {
 		opacity: 0;
 		transform: translateY(20px);
 	}
+
 	to {
 		opacity: 1;
 		transform: translateY(0);
@@ -1209,10 +1110,12 @@ export default {
 }
 
 @keyframes pulse {
+
 	0%,
 	100% {
 		transform: scale(1);
 	}
+
 	50% {
 		transform: scale(1.05);
 	}
@@ -1539,7 +1442,8 @@ body[dir="rtl"] .form-field {
 .expanded-content .pos-table__qty-counter.rtl-layout,
 html[dir="rtl"] .expanded-content .pos-table__qty-counter,
 body[dir="rtl"] .expanded-content .pos-table__qty-counter {
-	flex-direction: row !important; /* Use order instead of row-reverse */
+	flex-direction: row !important;
+	/* Use order instead of row-reverse */
 }
 
 /* Same button ordering for expanded content (reverse order values for RTL context) */
@@ -1550,7 +1454,8 @@ body[dir="rtl"] .expanded-content .pos-table__qty-counter {
 .expanded-content .pos-table__qty-counter.rtl-layout .plus-btn,
 html[dir="rtl"] .expanded-content .pos-table__qty-counter .plus-btn,
 body[dir="rtl"] .expanded-content .pos-table__qty-counter .plus-btn {
-	order: 3 !important; /* Plus button should appear first visually in RTL */
+	order: 3 !important;
+	/* Plus button should appear first visually in RTL */
 }
 
 [dir="rtl"] .expanded-content .pos-table__qty-counter .pos-table__qty-display,
@@ -1560,7 +1465,8 @@ body[dir="rtl"] .expanded-content .pos-table__qty-counter .plus-btn {
 .expanded-content .pos-table__qty-counter.rtl-layout .pos-table__qty-display,
 html[dir="rtl"] .expanded-content .pos-table__qty-counter .pos-table__qty-display,
 body[dir="rtl"] .expanded-content .pos-table__qty-counter .pos-table__qty-display {
-	order: 2 !important; /* Quantity stays in middle */
+	order: 2 !important;
+	/* Quantity stays in middle */
 }
 
 [dir="rtl"] .expanded-content .pos-table__qty-counter .minus-btn,
@@ -1570,7 +1476,8 @@ body[dir="rtl"] .expanded-content .pos-table__qty-counter .pos-table__qty-displa
 .expanded-content .pos-table__qty-counter.rtl-layout .minus-btn,
 html[dir="rtl"] .expanded-content .pos-table__qty-counter .minus-btn,
 body[dir="rtl"] .expanded-content .pos-table__qty-counter .minus-btn {
-	order: 1 !important; /* Minus button should appear last visually in RTL */
+	order: 1 !important;
+	/* Minus button should appear last visually in RTL */
 }
 
 /* Keep numbers LTR in expanded content */
@@ -1580,7 +1487,8 @@ body[dir="rtl"] .expanded-content .pos-table__qty-counter .minus-btn {
 [lang^="fa"] .expanded-content .pos-table__qty-display,
 html[dir="rtl"] .expanded-content .pos-table__qty-display,
 body[dir="rtl"] .expanded-content .pos-table__qty-display {
-	direction: ltr !important; /* Keep numbers readable */
+	direction: ltr !important;
+	/* Keep numbers readable */
 }
 
 /* =================================================================
@@ -2773,7 +2681,8 @@ body[dir="rtl"] .pos-table__qty-counter {
 .pos-table__qty-counter.rtl-layout .plus-btn,
 html[dir="rtl"] .pos-table__qty-counter .plus-btn,
 body[dir="rtl"] .pos-table__qty-counter .plus-btn {
-	order: 3 !important; /* Plus button should appear first visually */
+	order: 3 !important;
+	/* Plus button should appear first visually */
 }
 
 [dir="rtl"] .pos-table__qty-counter .pos-table__qty-display,
@@ -2783,7 +2692,8 @@ body[dir="rtl"] .pos-table__qty-counter .plus-btn {
 .pos-table__qty-counter.rtl-layout .pos-table__qty-display,
 html[dir="rtl"] .pos-table__qty-counter .pos-table__qty-display,
 body[dir="rtl"] .pos-table__qty-counter .pos-table__qty-display {
-	order: 2 !important; /* Quantity stays in middle */
+	order: 2 !important;
+	/* Quantity stays in middle */
 }
 
 [dir="rtl"] .pos-table__qty-counter .minus-btn,
@@ -2793,7 +2703,8 @@ body[dir="rtl"] .pos-table__qty-counter .pos-table__qty-display {
 .pos-table__qty-counter.rtl-layout .minus-btn,
 html[dir="rtl"] .pos-table__qty-counter .minus-btn,
 body[dir="rtl"] .pos-table__qty-counter .minus-btn {
-	order: 1 !important; /* Minus button should appear last visually */
+	order: 1 !important;
+	/* Minus button should appear last visually */
 }
 
 /* Keep numbers readable in RTL - multiple selectors */

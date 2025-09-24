@@ -1,21 +1,7 @@
 <template>
-	<v-dialog
-		v-model="showModal"
-		max-width="90vw"
-		max-height="90vh"
-		persistent
-		scrollable
-		:fullscreen="$vuetify.display.mobile"
-	>
+	<v-dialog v-model="showModal" max-width="90vw" max-height="90vh" scrollable :fullscreen="$vuetify.display.mobile">
 		<template v-slot:activator="{ props }">
-			<v-btn
-				v-bind="props"
-				color="primary"
-				size="large"
-				prepend-icon="mdi-shopping"
-				variant="elevated"
-				class="ma-2"
-			>
+			<v-btn v-bind="props" color="primary" density="comfortable" prepend-icon="mdi-shopping" variant="elevated" class="select-items-trigger-btn">
 				{{ __("Select Items") }}
 			</v-btn>
 		</template>
@@ -25,463 +11,261 @@
 				<v-icon class="mr-3">mdi-shopping</v-icon>
 				<span class="text-h6">{{ __("Select Items") }}</span>
 				<v-spacer></v-spacer>
-				<v-btn
-					icon="mdi-close"
-					variant="text"
-					@click="showModal = false"
-				></v-btn>
+				<v-btn icon="mdi-close" variant="text" @click="showModal = false"></v-btn>
 			</v-card-title>
 			<v-divider></v-divider>
 			<v-card-text class="pa-0">
 				<div :style="responsiveStyles">
-		<v-dialog v-model="scanErrorDialog" persistent max-width="420" content-class="scan-error-dialog">
-			<v-card>
-				<v-card-title class="d-flex align-center text-error text-h6">
-					<v-icon color="error" class="mr-2">mdi-alert-octagon</v-icon>
-					{{ __("Scan Error") }}
-				</v-card-title>
-				<v-divider></v-divider>
-				<v-card-text>
-					<p class="scan-error-message">{{ scanErrorMessage }}</p>
-					<p v-if="scanErrorCode" class="scan-error-code mt-2 mb-0">
-						<strong>{{ __("Scanned Code:") }}</strong>
-						<span>{{ scanErrorCode }}</span>
-					</p>
-					<p v-if="scanErrorDetails" class="scan-error-details mt-4 mb-0">
-						{{ scanErrorDetails }}
-					</p>
-				</v-card-text>
-				<v-card-actions class="justify-end">
-					<v-btn color="primary" variant="tonal" autofocus @click="acknowledgeScanError">
-						{{ __("OK") }}
-					</v-btn>
-				</v-card-actions>
-			</v-card>
-		</v-dialog>
-		<v-card
-			:class="[
-				'selection mx-auto my-0 py-0 mt-3 pos-card dynamic-card resizable pos-themed-card',
-				rtlClasses,
-			]"
-			:style="{
-				height: responsiveStyles['--container-height'],
-				maxHeight: responsiveStyles['--container-height'],
-				resize: 'vertical',
-				overflow: 'auto',
-				position: 'relative',
-			}"
-		>
-			<v-progress-linear
-				:active="loading"
-				:indeterminate="loading"
-				absolute
-				location="top"
-				color="info"
-			></v-progress-linear>
-
-			<!-- Add dynamic-padding wrapper like Invoice component -->
-			<div class="dynamic-padding">
-				<div class="sticky-header">
-					<v-row class="items">
-						<v-col class="pb-0">
-							<v-text-field
-								density="compact"
-								clearable
-								autofocus
-								variant="solo"
-								color="primary"
-								:label="frappe._('Search Items')"
-								hint="Search by item code, serial number, batch no or barcode"
-								hide-details
-								v-model="debounce_search"
-								@keydown.esc="esc_event"
-								@keydown.enter="search_onchange"
-								@click:clear="clearSearch"
-								prepend-inner-icon="mdi-magnify"
-								@focus="handleItemSearchFocus"
-								ref="debounce_search"
-							>
-								<!-- Add camera scan button if enabled -->
-								<template v-slot:append-inner v-if="pos_profile.posa_enable_camera_scanning">
-									<v-btn
-										icon="mdi-camera"
-										size="small"
-										color="primary"
-										variant="text"
-										:disabled="scannerLocked"
-										@click="startCameraScanning"
-										:title="
-											scannerLocked
-												? __('Acknowledge the error to resume scanning')
-												: __('Scan with Camera')
-										"
-									>
-									</v-btn>
-								</template>
-							</v-text-field>
-						</v-col>
-						<v-col cols="3" class="pb-0" v-if="pos_profile.posa_input_qty">
-							<v-text-field
-								density="compact"
-								variant="solo"
-								color="primary"
-								:label="frappe._('QTY')"
-								hide-details
-								v-model="debounce_qty"
-								type="text"
-								@keydown.enter="enter_event"
-								@keydown.esc="esc_event"
-								@focus="clearQty"
-							></v-text-field>
-						</v-col>
-						<v-col cols="2" class="pb-0" v-if="pos_profile.posa_new_line">
-							<v-checkbox
-								v-model="new_line"
-								color="accent"
-								value="true"
-								label="NLine"
-								density="default"
-								hide-details
-							></v-checkbox>
-						</v-col>
-						<v-col cols="12" class="dynamic-margin-xs">
-							<div class="settings-container">
-								<v-btn
-									density="compact"
-									variant="text"
-									color="primary"
-									prepend-icon="mdi-cog-outline"
-									@click="toggleItemSettings"
-									class="settings-btn"
-								>
-									{{ __("Settings") }}
+					<v-dialog v-model="scanErrorDialog" max-width="420" content-class="scan-error-dialog" @keydown.esc.stop.prevent="acknowledgeScanError">
+						<v-card>
+							<v-card-title class="d-flex align-center text-error text-h6">
+								<v-icon color="error" class="mr-2">mdi-alert-octagon</v-icon>
+								{{ __("Scan Error") }}
+							</v-card-title>
+							<v-divider></v-divider>
+							<v-card-text>
+								<p class="scan-error-message">{{ scanErrorMessage }}</p>
+								<p v-if="scanErrorCode" class="scan-error-code mt-2 mb-0">
+									<strong>{{ __("Scanned Code:") }}</strong>
+									<span>{{ scanErrorCode }}</span>
+								</p>
+								<p v-if="scanErrorDetails" class="scan-error-details mt-4 mb-0">
+									{{ scanErrorDetails }}
+								</p>
+							</v-card-text>
+							<v-card-actions class="justify-end">
+								<v-btn color="primary" variant="tonal" autofocus @click="acknowledgeScanError">
+									{{ __("OK") }}
 								</v-btn>
-								<v-spacer></v-spacer>
-								<v-btn
-									density="compact"
-									variant="text"
-									color="primary"
-									prepend-icon="mdi-refresh"
-									@click="forceReloadItems"
-									class="settings-btn"
-								>
-									{{ __("Reload Items") }}
-								</v-btn>
+							</v-card-actions>
+						</v-card>
+					</v-dialog>
+					<v-card :class="[
+						'selection mx-auto my-0 py-0 mt-3 pos-card dynamic-card pos-themed-card selector-main-card',
+						rtlClasses,
+					]" :style="selectorContainerStyles">
+						<v-progress-linear :active="loading" :indeterminate="loading" absolute location="top" color="info"></v-progress-linear>
 
-								<v-dialog v-model="show_item_settings" max-width="400px">
-									<v-card>
-										<v-card-title class="text-h6 pa-4 d-flex align-center">
-											<span>{{ __("Item Selector Settings") }}</span>
-											<v-spacer></v-spacer>
-											<v-btn
-												icon="mdi-close"
-												variant="text"
-												density="compact"
-												@click="show_item_settings = false"
-											>
-											</v-btn>
-										</v-card-title>
-										<v-divider></v-divider>
-										<v-card-text class="pa-4">
-											<v-switch
-												v-model="temp_hide_qty_decimals"
-												:label="__('Hide quantity decimals')"
-												hide-details
-												density="compact"
-												color="primary"
-												class="mb-2"
-											></v-switch>
-											<v-switch
-												v-model="temp_hide_zero_rate_items"
-												:label="__('Hide zero rated items')"
-												hide-details
-												density="compact"
-												color="primary"
-											></v-switch>
-											<v-switch
-												v-model="temp_enable_custom_items_per_page"
-												:label="__('Custom items per page')"
-												hide-details
-												density="compact"
-												color="primary"
-												class="mb-2"
-											>
-											</v-switch>
-											<v-checkbox
-												v-model="temp_force_server_items"
-												:label="
-													__('Always fetch items from server (ignore local cache)')
-												"
-												hide-details
-												density="compact"
-												color="primary"
-												class="mb-2"
-											></v-checkbox>
-											<v-text-field
-												v-if="temp_enable_custom_items_per_page"
-												v-model="temp_items_per_page"
-												type="number"
-												density="compact"
-												variant="outlined"
-												color="primary"
-												hide-details
-												:label="__('Items per page')"
-												class="mb-2 pos-themed-input"
-											>
+						<div class="selector-scroll">
+							<!-- Add dynamic-padding wrapper like Invoice component -->
+							<div class="dynamic-padding">
+								<div class="sticky-header">
+									<v-row class="items">
+										<v-col class="pb-0">
+											<v-text-field density="compact" clearable autofocus variant="solo" color="primary" :label="frappe._('Search Items')" hint="Search by item code, serial number, batch no or barcode" hide-details v-model="debounce_search" @keydown.esc.stop="esc_event" @keydown.enter="search_onchange" @click:clear="clearSearch" prepend-inner-icon="mdi-magnify" @focus="handleItemSearchFocus" ref="debounce_search">
+												<!-- Add camera scan button if enabled -->
+												<template v-slot:append-inner v-if="pos_profile.posa_enable_camera_scanning">
+													<v-btn icon="mdi-camera" size="small" color="primary" variant="text" :disabled="scannerLocked" @click="startCameraScanning" :title="scannerLocked
+														? __('Acknowledge the error to resume scanning')
+														: __('Scan with Camera')
+														">
+													</v-btn>
+												</template>
 											</v-text-field>
-										</v-card-text>
-										<v-card-actions class="pa-4 pt-0">
-											<v-btn color="error" variant="text" @click="cancelItemSettings"
-												>{{ __("Cancel") }}
-											</v-btn>
-											<v-spacer></v-spacer>
-											<v-btn color="primary" variant="tonal" @click="applyItemSettings"
-												>{{ __("Apply") }}
-											</v-btn>
-										</v-card-actions>
-									</v-card>
-								</v-dialog>
-							</div>
-						</v-col>
-					</v-row>
-				</div>
-				<v-row class="items">
-					<v-col cols="12" class="pt-0 mt-0">
-						<div v-if="items_view == 'card'" class="items-card-container">
-							<div v-if="loading" class="items-card-grid">
-								<Skeleton v-for="n in 8" :key="n" class="mb-4" height="120" />
-							</div>
-							<div
-								v-else
-								class="items-card-grid"
-								ref="itemsContainer"
-								@scroll.passive="onCardScroll"
-								:class="{ 'item-container': isOverflowing }"
-							>
-								<div
-									v-for="item in filtered_items"
-									:key="item.item_code"
-									class="card-item-card"
-									@click="select_item($event, item)"
-									:draggable="true"
-									@dragstart="onDragStart($event, item)"
-									@dragend="onDragEnd"
-								>
-									<div class="card-item-image-container">
-										<v-img
-											:src="item.image || placeholderImage"
-											class="card-item-image"
-											aspect-ratio="1"
-											:alt="item.item_name"
-										>
-											<template v-slot:placeholder>
-												<div class="image-placeholder">
-													<v-icon size="40" color="grey-lighten-2"
-														>mdi-image</v-icon
-													>
-												</div>
-											</template>
-										</v-img>
-									</div>
-									<div class="card-item-content">
-										<div class="card-item-header">
-											<h4 class="card-item-name">{{ item.item_name }}</h4>
-											<span class="card-item-code">{{ item.item_code }}</span>
-										</div>
-										<div class="card-item-details">
-											<div class="card-item-price">
-												<div class="primary-price">
-													<span class="currency-symbol">
-														{{
-															currencySymbol(
-																item.original_currency ||
-																	pos_profile.currency,
-															)
-														}}
-													</span>
-													<span class="price-amount">
-														{{
-															format_currency(
-																item.base_price_list_rate ?? item.rate ?? 0,
-																item.original_currency ||
-																	pos_profile.currency,
-																ratePrecision(
-																	item.base_price_list_rate ??
-																		item.rate ??
-																		0,
-																),
-															)
-														}}
-													</span>
-												</div>
-												<div
-													v-if="
-														pos_profile.posa_allow_multi_currency &&
-														selected_currency !== pos_profile.currency
-													"
-													class="secondary-price"
-												>
-													<span class="currency-symbol">{{
-														currencySymbol(selected_currency)
-													}}</span>
-													<span class="price-amount">
-														{{
-															format_currency(
-																item.rate,
-																selected_currency,
-																ratePrecision(item.rate),
-															)
-														}}
-													</span>
-												</div>
-											</div>
-											<div class="card-item-stock">
-												<v-icon size="small" class="stock-icon"
-													>mdi-package-variant</v-icon
-												>
-												<span
-													class="stock-amount"
-													:class="{
-														'negative-number': isNegative(item.actual_qty),
-													}"
-												>
-													{{
-														format_number(
-															item.actual_qty,
-															hide_qty_decimals ? 0 : 4,
-														) || 0
-													}}
-												</span>
-												<span class="stock-uom">{{ item.stock_uom || "" }}</span>
-											</div>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-						<div v-else class="items-table-container">
-							<v-data-table-virtual
-								:headers="headers"
-								:items="filtered_items"
-								class="sleek-data-table overflow-y-auto"
-								:style="{ height: 'calc(100% - 80px)' }"
-								item-key="item_code"
-								fixed-header
-								height="100%"
-								:header-props="headerProps"
-								:no-data-text="__('No items found')"
-								@click:row="click_item_row"
-								@scroll.passive="onListScroll"
-							>
-								<template v-slot:item.rate="{ item }">
-									<div>
-										<div class="text-primary">
-											{{
-												currencySymbol(item.original_currency || pos_profile.currency)
-											}}
-											{{
-												format_currency(
-													item.base_price_list_rate ?? item.rate ?? 0,
-													item.original_currency || pos_profile.currency,
-													ratePrecision(
-														item.base_price_list_rate ?? item.rate ?? 0,
-													),
-												)
-											}}
-										</div>
-										<div
-											v-if="
-												pos_profile.posa_allow_multi_currency &&
-												selected_currency !== pos_profile.currency
-											"
-											class="text-success"
-										>
-											{{ currencySymbol(selected_currency) }}
-											{{
-												format_currency(
-													item.rate,
-													selected_currency,
-													ratePrecision(item.rate),
-												)
-											}}
-										</div>
-									</div>
-								</template>
-								<template v-slot:item.actual_qty="{ item }">
-									<span
-										class="golden--text"
-										:class="{ 'negative-number': isNegative(item.actual_qty) }"
-										>{{ format_number(item.actual_qty, hide_qty_decimals ? 0 : 4) }}</span
-									>
-								</template>
-							</v-data-table-virtual>
-						</div>
-					</v-col>
-				</v-row>
-			</div>
-		</v-card>
-		<v-card class="cards mb-0 mt-3 dynamic-padding resizable" style="resize: vertical; overflow: auto">
-			<v-row no-gutters align="center" justify="center" class="dynamic-spacing-sm">
-				<v-col cols="12" class="mb-2">
-					<v-select
-						:items="items_group"
-						:label="frappe._('Items Group')"
-						density="compact"
-						variant="solo"
-						hide-details
-						v-model="item_group"
-					></v-select>
-				</v-col>
-				<v-col cols="12" class="mb-2" v-if="pos_profile.posa_enable_price_list_dropdown !== false">
-					<v-text-field
-						density="compact"
-						variant="solo"
-						color="primary"
-						:label="frappe._('Price List')"
-						hide-details
-						:model-value="active_price_list"
-						readonly
-					></v-text-field>
-				</v-col>
-				<v-col cols="3" class="dynamic-margin-xs">
-					<v-btn-toggle v-model="items_view" color="primary" group density="compact" rounded>
-						<v-btn size="small" value="list">{{ __("List") }}</v-btn>
-						<v-btn size="small" value="card">{{ __("Card") }}</v-btn>
-					</v-btn-toggle>
-				</v-col>
-				<v-col cols="5" class="dynamic-margin-xs">
-					<v-btn
-						size="small"
-						block
-						color="warning"
-						variant="text"
-						@click="show_offers"
-						class="action-btn-consistent"
-					>
-						{{ offersCount }} {{ __("Offers") }}
-					</v-btn>
-				</v-col>
-				<v-col cols="4" class="dynamic-margin-xs">
-					<v-btn
-						size="small"
-						block
-						color="primary"
-						variant="text"
-						@click="show_coupons"
-						class="action-btn-consistent"
-						>{{ couponsCount }} {{ __("Coupons") }}</v-btn
-					>
-				</v-col>
-			</v-row>
-		</v-card>
+										</v-col>
+										<v-col cols="3" class="pb-0" v-if="pos_profile.posa_input_qty">
+											<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('QTY')" hide-details v-model="debounce_qty" type="text" @keydown.enter="enter_event" @keydown.esc.stop="esc_event" @focus="clearQty"></v-text-field>
+										</v-col>
+										<v-col cols="2" class="pb-0" v-if="pos_profile.posa_new_line">
+											<v-checkbox v-model="new_line" color="accent" value="true" label="NLine" density="default" hide-details></v-checkbox>
+										</v-col>
+										<v-col cols="12" class="dynamic-margin-xs">
+											<div class="settings-container">
+												<v-btn density="compact" variant="text" color="primary" prepend-icon="mdi-cog-outline" @click="toggleItemSettings" class="settings-btn">
+													{{ __("Settings") }}
+												</v-btn>
+												<v-spacer></v-spacer>
+												<v-btn density="compact" variant="text" color="primary" prepend-icon="mdi-refresh" @click="forceReloadItems" class="settings-btn">
+													{{ __("Reload Items") }}
+												</v-btn>
 
-		<!-- Camera Scanner Component -->
-		<CameraScanner
-			v-if="pos_profile.posa_enable_camera_scanning"
-			ref="cameraScanner"
-			:scan-type="pos_profile.posa_camera_scan_type || 'Both'"
-			@barcode-scanned="onBarcodeScanned"
-		/>
+												<v-dialog v-model="show_item_settings" max-width="400px" @keydown.esc.stop.prevent="cancelItemSettings">
+													<v-card>
+														<v-card-title class="text-h6 pa-4 d-flex align-center">
+															<span>{{ __("Item Selector Settings") }}</span>
+															<v-spacer></v-spacer>
+															<v-btn icon="mdi-close" variant="text" density="compact" @click="show_item_settings = false">
+															</v-btn>
+														</v-card-title>
+														<v-divider></v-divider>
+														<v-card-text class="pa-4">
+															<v-switch v-model="temp_hide_qty_decimals" :label="__('Hide quantity decimals')" hide-details density="compact" color="primary" class="mb-2"></v-switch>
+															<v-switch v-model="temp_hide_zero_rate_items" :label="__('Hide zero rated items')" hide-details density="compact" color="primary"></v-switch>
+															<v-switch v-model="temp_enable_custom_items_per_page" :label="__('Custom items per page')" hide-details density="compact" color="primary" class="mb-2">
+															</v-switch>
+															<v-checkbox v-model="temp_force_server_items" :label="__('Always fetch items from server (ignore local cache)')
+																" hide-details density="compact" color="primary" class="mb-2"></v-checkbox>
+															<v-text-field v-if="temp_enable_custom_items_per_page" v-model="temp_items_per_page" type="number" density="compact" variant="outlined" color="primary" hide-details :label="__('Items per page')" class="mb-2 pos-themed-input">
+															</v-text-field>
+														</v-card-text>
+														<v-card-actions class="pa-4 pt-0">
+															<v-btn color="error" variant="text" @click="cancelItemSettings">{{ __("Cancel") }}
+															</v-btn>
+															<v-spacer></v-spacer>
+															<v-btn color="primary" variant="tonal" @click="applyItemSettings">{{ __("Apply") }}
+															</v-btn>
+														</v-card-actions>
+													</v-card>
+												</v-dialog>
+											</div>
+										</v-col>
+									</v-row>
+								</div>
+								<v-row class="items">
+									<v-col cols="12" class="pt-0 mt-0">
+										<div v-if="items_view == 'card'" class="items-card-container">
+											<div v-if="loading" class="items-card-grid">
+												<Skeleton v-for="n in 8" :key="n" class="mb-4" height="120" />
+											</div>
+											<div v-else class="items-card-grid" ref="itemsContainer" @scroll.passive="onCardScroll" :class="{ 'item-container': isOverflowing }">
+												<div v-for="item in filtered_items" :key="item.item_code" class="card-item-card" @click="select_item($event, item)" :draggable="true" @dragstart="onDragStart($event, item)" @dragend="onDragEnd">
+													<div class="card-item-image-container">
+														<v-img :src="item.image || placeholderImage" class="card-item-image" aspect-ratio="1" :alt="item.item_name">
+															<template v-slot:placeholder>
+																<div class="image-placeholder">
+																	<v-icon size="40" color="grey-lighten-2">mdi-image</v-icon>
+																</div>
+															</template>
+														</v-img>
+													</div>
+													<div class="card-item-content">
+														<div class="card-item-header">
+															<h4 class="card-item-name">{{ item.item_name }}</h4>
+															<span class="card-item-code">{{ item.item_code }}</span>
+														</div>
+														<div class="card-item-details">
+															<div class="card-item-price">
+																<div class="primary-price">
+																	<span class="currency-symbol">
+																		{{
+																			currencySymbol(
+																				item.original_currency ||
+																				pos_profile.currency,
+																			)
+																		}}
+																	</span>
+																	<span class="price-amount">
+																		{{
+																			format_currency(
+																				item.base_price_list_rate ?? item.rate ?? 0,
+																				item.original_currency ||
+																				pos_profile.currency,
+																				ratePrecision(
+																					item.base_price_list_rate ??
+																					item.rate ??
+																					0,
+																				),
+																			)
+																		}}
+																	</span>
+																</div>
+																<div v-if="
+																	pos_profile.posa_allow_multi_currency &&
+																	selected_currency !== pos_profile.currency
+																" class="secondary-price">
+																	<span class="currency-symbol">{{
+																		currencySymbol(selected_currency)
+																	}}</span>
+																	<span class="price-amount">
+																		{{
+																			format_currency(
+																				item.rate,
+																				selected_currency,
+																				ratePrecision(item.rate),
+																			)
+																		}}
+																	</span>
+																</div>
+															</div>
+															<div class="card-item-stock">
+																<v-icon size="small" class="stock-icon">mdi-package-variant</v-icon>
+																<span class="stock-amount" :class="{
+																	'negative-number': isNegative(item.actual_qty),
+																}">
+																	{{
+																		format_number(
+																			item.actual_qty,
+																			hide_qty_decimals ? 0 : 4,
+																		) || 0
+																	}}
+																</span>
+																<span class="stock-uom">{{ item.stock_uom || "" }}</span>
+															</div>
+														</div>
+													</div>
+												</div>
+											</div>
+										</div>
+										<div v-else class="items-table-container">
+											<v-data-table-virtual :headers="headers" :items="filtered_items" class="sleek-data-table overflow-y-auto" :style="{ height: 'calc(100% - 80px)' }" item-key="item_code" fixed-header height="100%" :header-props="headerProps" :no-data-text="__('No items found')" @click:row="click_item_row" @scroll.passive="onListScroll">
+												<template v-slot:item.rate="{ item }">
+													<div>
+														<div class="text-primary">
+															{{
+																currencySymbol(item.original_currency || pos_profile.currency)
+															}}
+															{{
+																format_currency(
+																	item.base_price_list_rate ?? item.rate ?? 0,
+																	item.original_currency || pos_profile.currency,
+																	ratePrecision(
+																		item.base_price_list_rate ?? item.rate ?? 0,
+																	),
+																)
+															}}
+														</div>
+														<div v-if="
+															pos_profile.posa_allow_multi_currency &&
+															selected_currency !== pos_profile.currency
+														" class="text-success">
+															{{ currencySymbol(selected_currency) }}
+															{{
+																format_currency(
+																	item.rate,
+																	selected_currency,
+																	ratePrecision(item.rate),
+																)
+															}}
+														</div>
+													</div>
+												</template>
+												<template v-slot:item.actual_qty="{ item }">
+													<span class="golden--text" :class="{ 'negative-number': isNegative(item.actual_qty) }">{{ format_number(item.actual_qty, hide_qty_decimals ? 0 : 4) }}</span>
+												</template>
+											</v-data-table-virtual>
+										</div>
+									</v-col>
+								</v-row>
+								<v-card class="cards mb-0 mt-3 dynamic-padding selector-secondary-card">
+									<v-row no-gutters align="center" justify="center" class="dynamic-spacing-sm">
+										<v-col cols="12" class="mb-2">
+											<v-select :items="items_group" :label="frappe._('Items Group')" density="compact" variant="solo" hide-details v-model="item_group"></v-select>
+										</v-col>
+										<v-col cols="12" class="mb-2" v-if="pos_profile.posa_enable_price_list_dropdown !== false">
+											<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Price List')" hide-details :model-value="active_price_list" readonly></v-text-field>
+										</v-col>
+										<v-col cols="3" class="dynamic-margin-xs">
+											<v-btn-toggle v-model="items_view" color="primary" group density="compact" rounded>
+												<v-btn size="small" value="list">{{ __("List") }}</v-btn>
+												<v-btn size="small" value="card">{{ __("Card") }}</v-btn>
+											</v-btn-toggle>
+										</v-col>
+										<v-col cols="5" class="dynamic-margin-xs">
+											<v-btn size="small" block color="warning" variant="text" @click="show_offers" class="action-btn-consistent">
+												{{ offersCount }} {{ __("Offers") }}
+											</v-btn>
+										</v-col>
+										<v-col cols="4" class="dynamic-margin-xs">
+											<v-btn size="small" block color="primary" variant="text" @click="show_coupons" class="action-btn-consistent">{{ couponsCount }} {{ __("Coupons") }}</v-btn>
+										</v-col>
+									</v-row>
+								</v-card>
+							</div>
+
+							<!-- Camera Scanner Component -->
+							<CameraScanner v-if="pos_profile.posa_enable_camera_scanning" ref="cameraScanner" :scan-type="pos_profile.posa_camera_scan_type || 'Both'" @barcode-scanned="onBarcodeScanned" />
+						</div>
+					</v-card>
 				</div>
 			</v-card-text>
 		</v-card>
@@ -623,6 +407,7 @@ export default {
 		scanAudioContext: null,
 		pendingScanCode: "",
 		awaitingScanResult: false,
+		unwatchScanError: null,
 	}),
 
 	watch: {
@@ -1964,15 +1749,15 @@ export default {
 					if (shouldBlock || negativeStockEnabled) {
 						const formattedAvailable = this.format_number
 							? this.format_number(
-									availableQty,
-									this.hide_qty_decimals ? 0 : this.float_precision,
-								)
+								availableQty,
+								this.hide_qty_decimals ? 0 : this.float_precision,
+							)
 							: availableQty;
 						const formattedRequested = this.format_number
 							? this.format_number(
-									requestedQty,
-									this.hide_qty_decimals ? 0 : this.float_precision,
-								)
+								requestedQty,
+								this.hide_qty_decimals ? 0 : this.float_precision,
+							)
 							: requestedQty;
 
 						if (shouldBlock) {
@@ -2553,7 +2338,7 @@ export default {
 				this.scanAudioContext = new AudioContext();
 			}
 			if (this.scanAudioContext?.state === "suspended") {
-				this.scanAudioContext.resume().catch(() => {});
+				this.scanAudioContext.resume().catch(() => { });
 			}
 			return this.scanAudioContext;
 		},
@@ -2612,6 +2397,8 @@ export default {
 		},
 		acknowledgeScanError() {
 			this.scanErrorDialog = false;
+		},
+		resetScanErrorState() {
 			this.scannerLocked = false;
 			this.scanErrorMessage = "";
 			this.scanErrorCode = "";
@@ -3104,6 +2891,26 @@ export default {
 	},
 
 	computed: {
+		selectorContainerStyles() {
+			const viewportHeight = this.windowHeight || (typeof window !== "undefined" ? window.innerHeight : 800);
+			const isMobile = this.$vuetify?.display?.mobile;
+			const verticalAllowance = isMobile ? 96 : 180;
+			const minHeight = isMobile ? 340 : 480;
+			const maxHeightCap = isMobile ? 640 : 760;
+			const availableHeight = viewportHeight - verticalAllowance;
+			const targetHeight = Math.max(minHeight, Math.min(availableHeight, maxHeightCap));
+			const maxDialogHeight = viewportHeight - (isMobile ? 48 : 96);
+			const cappedHeight = Math.min(targetHeight, maxDialogHeight > 0 ? maxDialogHeight : targetHeight);
+			const heightValue = Number.isFinite(cappedHeight) ? cappedHeight : minHeight;
+			return {
+				height: `${Math.round(heightValue)}px`,
+				maxHeight: `${Math.round(heightValue)}px`,
+				display: "flex",
+				flexDirection: "column",
+				overflow: "hidden",
+				position: "relative",
+			};
+		},
 		headers() {
 			return this.getItemsHeaders();
 		},
@@ -3372,6 +3179,31 @@ export default {
 			this.update_cur_items_details();
 		});
 	},
+	handleEscapeKey(event) {
+		if (event.key !== "Escape" || event.defaultPrevented) {
+			return;
+		}
+
+		if (this.scanErrorDialog) {
+			event.preventDefault();
+			event.stopPropagation();
+			this.scanErrorDialog = false;
+			return;
+		}
+
+		if (this.show_item_settings) {
+			event.preventDefault();
+			event.stopPropagation();
+			this.cancelItemSettings();
+			return;
+		}
+
+		if (this.showModal) {
+			event.preventDefault();
+			event.stopPropagation();
+			this.showModal = false;
+		}
+	},
 	handleKeyboardShortcut(event) {
 		// Check for Ctrl+I or Cmd+I to open items selector modal
 		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'i') {
@@ -3420,6 +3252,15 @@ export default {
 		this.itemsPerPage = this.items_per_page;
 		// Add keyboard shortcut to open modal (Ctrl+I or Cmd+I)
 		document.addEventListener("keydown", this.handleKeyboardShortcut);
+		document.addEventListener("keydown", this.handleEscapeKey);
+		this.unwatchScanError = this.$watch(
+			() => this.scanErrorDialog,
+			(value, oldValue) => {
+				if (oldValue && !value) {
+					this.resetScanErrorState();
+				}
+			},
+		);
 		window.addEventListener("resize", this.checkItemContainerOverflow);
 		this.$nextTick(this.checkItemContainerOverflow);
 	},
@@ -3474,15 +3315,24 @@ export default {
 		this.eventBus.off("force_reload_items");
 		this.eventBus.off("focus_item_search");
 		document.removeEventListener("keydown", this.handleKeyboardShortcut);
+		document.removeEventListener("keydown", this.handleEscapeKey);
+		if (typeof this.unwatchScanError === "function") {
+			this.unwatchScanError();
+			this.unwatchScanError = null;
+		}
 		window.removeEventListener("resize", this.checkItemContainerOverflow);
 	},
 };
 </script>
 
 <style scoped>
+.select-items-trigger-btn {
+	margin: 0;
+	white-space: nowrap;
+}
+
 /* Modal-specific styles */
 .items-selector-modal {
-	height: 90vh;
 	max-height: 90vh;
 	display: flex;
 	flex-direction: column;
@@ -3493,23 +3343,26 @@ export default {
 	overflow: hidden;
 }
 
-.items-selector-modal .dynamic-card {
-	height: 100%;
-	max-height: none;
+.selector-main-card {
 	border: none;
 	box-shadow: none;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
 }
 
-/* Ensure proper scrolling within modal */
-.items-selector-modal .item-container {
-	max-height: calc(90vh - 150px);
+.selector-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
 	overflow-y: auto;
 }
 
-@media (max-width: 768px) {
-	.items-selector-modal .item-container {
-		max-height: calc(100vh - 120px);
-	}
+.selector-secondary-card {
+	overflow: visible;
+}
+
+.selector-scroll .item-container {
+	max-height: none;
 }
 
 /* "dynamic-card" no longer composes from pos-card; the pos-card class is added directly in the template */
@@ -3840,9 +3693,10 @@ export default {
 .primary-price {
 	display: flex;
 	align-items: center;
-	gap: 2px;
+	gap: 3px;
 	font-weight: 600;
 	color: var(--primary-color, #1976d2);
+
 }
 
 .secondary-price {
@@ -4236,6 +4090,7 @@ export default {
 
 /* Reduce complexity of hover effects */
 @media (hover: hover) {
+
 	.dynamic-item-card:hover,
 	.card-item-card:hover {
 		/* Use GPU-accelerated transforms only */
@@ -4247,6 +4102,7 @@ export default {
 
 /* Disable animations on reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
+
 	.dynamic-item-card,
 	.card-item-card,
 	.card-item-image,
