@@ -55,6 +55,41 @@ export default {
 		});
 		return this.flt(sum, this.float_precision);
 	},
+	// Calculate aggregate tax using current invoice snapshot
+	calculatedTaxTotal() {
+		const doc = this.get_invoice_doc();
+		if (!doc) {
+			return 0;
+		}
+
+		let taxTotal = 0;
+		if (Array.isArray(doc.taxes) && doc.taxes.length) {
+			taxTotal = doc.taxes.reduce((sum, tax) => sum + flt(tax?.tax_amount || 0), 0);
+		} else if (doc.total_taxes_and_charges != null) {
+			taxTotal = flt(doc.total_taxes_and_charges);
+		}
+
+		return this.flt(taxTotal, this.currency_precision);
+	},
+	// Determine the grand total including taxes and rounding
+	calculatedGrandTotal() {
+		const doc = this.get_invoice_doc();
+		if (!doc) {
+			return this.subtotal;
+		}
+
+		let total = doc.rounded_total;
+		if (total == null) {
+			const taxTotal = Array.isArray(doc.taxes) && doc.taxes.length
+				? doc.taxes.reduce((sum, tax) => sum + flt(tax?.tax_amount || 0), 0)
+				: doc.total_taxes_and_charges != null
+					? flt(doc.total_taxes_and_charges)
+					: 0;
+			total = doc.grand_total != null ? doc.grand_total : this.subtotal + taxTotal;
+		}
+
+		return this.flt(total, this.currency_precision);
+	},
 	// Format posting_date for display as DD-MM-YYYY
 	formatted_posting_date: {
 		get() {

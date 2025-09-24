@@ -85,6 +85,34 @@
 						class="summary-field"
 					/>
 				</v-col>
+
+				<v-col cols="12" sm="6">
+					<v-text-field
+						:model-value="formatCurrency(normalizedTaxTotal)"
+						:prefix="currencySymbol(displayCurrency)"
+						:label="frappe._('Tax')"
+						prepend-inner-icon="mdi-receipt"
+						variant="solo"
+						density="compact"
+						readonly
+						color="secondary"
+						class="summary-field"
+					/>
+				</v-col>
+
+				<v-col cols="12" sm="6">
+					<v-text-field
+						:model-value="formatCurrency(normalizedGrandTotal)"
+						:prefix="currencySymbol(displayCurrency)"
+						:label="frappe._('Grand Total')"
+						prepend-inner-icon="mdi-cash-plus"
+						variant="solo"
+						density="compact"
+						readonly
+						color="primary"
+						class="summary-field"
+					/>
+				</v-col>
 			</v-row>
 		</div>
 
@@ -197,7 +225,15 @@ export default {
 		additional_discount: Number,
 		additional_discount_percentage: Number,
 		total_items_discount_amount: Number,
-		subtotal: Number,
+		subtotal: [Number, String],
+		taxTotal: {
+			type: [Number, String],
+			default: 0,
+		},
+		grandTotal: {
+			type: [Number, String],
+			default: 0,
+		},
 		displayCurrency: String,
 		formatFloat: Function,
 		formatCurrency: Function,
@@ -241,6 +277,19 @@ export default {
 				console.error("Failed to load item selector settings:", e);
 			}
 			return false;
+		},
+		normalizedTaxTotal() {
+			const value = parseFloat(this.taxTotal);
+			return Number.isNaN(value) ? 0 : value;
+		},
+
+		normalizedGrandTotal() {
+			const value = parseFloat(this.grandTotal);
+			if (!Number.isNaN(value)) {
+				return value;
+			}
+			const fallback = parseFloat(this.subtotal);
+			return Number.isNaN(fallback) ? 0 : fallback;
 		},
 	},
 	methods: {

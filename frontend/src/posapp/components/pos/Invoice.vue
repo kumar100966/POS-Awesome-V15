@@ -111,7 +111,7 @@
 						</div>
 
 						<!-- ItemsTable component with reorder event handler -->
-						<ItemsTable ref="itemsTable" :headers="items_headers" :items="items" v-model:expanded="expanded" :itemsPerPage="itemsPerPage" :itemSearch="itemSearch" :pos_profile="pos_profile" :invoice_doc="invoice_doc" :invoiceType="invoiceType" :stock_settings="stock_settings" :displayCurrency="displayCurrency" :formatFloat="formatFloat" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :isNumber="isNumber" :setFormatedQty="setFormatedQty" :setFormatedCurrency="setFormatedCurrency" :calcPrices="calc_prices" :calcUom="calc_uom" :setSerialNo="set_serial_no" :setBatchQty="set_batch_qty" :validateDueDate="validate_due_date" :removeItem="remove_item" :subtractOne="subtract_one" :addOne="add_one" :toggleOffer="toggleOffer" :changePriceListRate="change_price_list_rate" :isNegative="isNegative" @update:expanded="handleExpandedUpdate" @reorder-items="handleItemReorder" @add-item-from-drag="handleItemDrop" @show-drop-feedback="showDropFeedback" @item-dropped="showDropFeedback(false)" @view-packed="openPackedItems" />
+						<ItemsTable ref="itemsTable" :headers="items_headers" :items="items" v-model:expanded="expanded" :itemsPerPage="itemsPerPage" :itemSearch="itemSearch" :pos_profile="pos_profile" :invoice_doc="invoice_doc" :invoiceType="invoiceType" :stock_settings="stock_settings" :displayCurrency="displayCurrency" :formatFloat="formatFloat" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :isNumber="isNumber" :setFormatedQty="setFormatedQty" :setFormatedCurrency="setFormatedCurrency" :calcPrices="calc_prices" :calcUom="calc_uom" :setSerialNo="set_serial_no" :setBatchQty="set_batch_qty" :validateDueDate="validate_due_date" :removeItem="remove_item" :subtractOne="subtract_one" :addOne="add_one" :toggleOffer="toggleOffer" :changePriceListRate="change_price_list_rate" :isNegative="isNegative" @update:expanded="handleExpandedUpdate" @reorder-items="handleItemReorder" @add-item-from-drag="handleItemDrop" @show-drop-feedback="showDropFeedback" @item-dropped="showDropFeedback(false)" @view-packed="openPackedItems" @stock-limit-reached="handleStockLimitWarning" />
 						<v-dialog v-model="show_packed_dialog" max-width="800px" attach="body">
 							<v-card>
 								<v-card-title class="d-flex align-center">
@@ -162,7 +162,7 @@
 			</div>
 			<div class="invoice-content-right">
 				<!-- Payment Section -->
-				<InvoiceSummary :pos_profile="pos_profile" :total_qty="total_qty" :additional_discount="additional_discount" :additional_discount_percentage="additional_discount_percentage" :total_items_discount_amount="total_items_discount_amount" :subtotal="subtotal" :displayCurrency="displayCurrency" :formatFloat="formatFloat" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :discount_percentage_offer_name="discount_percentage_offer_name" :isNumber="isNumber" @update:additional_discount="(val) => (additional_discount = val)" @update:additional_discount_percentage="(val) => (additional_discount_percentage = val)" @update_discount_umount="update_discount_umount" @save-and-clear="save_and_clear_invoice" @load-drafts="get_draft_invoices" @select-order="get_draft_orders" @cancel-sale="cancel_dialog = true" @open-returns="open_returns" @print-draft="print_draft_invoice" @show-payment="show_payment" />
+				<InvoiceSummary :pos_profile="pos_profile" :total_qty="total_qty" :additional_discount="additional_discount" :additional_discount_percentage="additional_discount_percentage" :total_items_discount_amount="total_items_discount_amount" :subtotal="subtotal" :tax-total="calculatedTaxTotal" :grand-total="calculatedGrandTotal" :displayCurrency="displayCurrency" :formatFloat="formatFloat" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :discount_percentage_offer_name="discount_percentage_offer_name" :isNumber="isNumber" @update:additional_discount="(val) => (additional_discount = val)" @update:additional_discount_percentage="(val) => (additional_discount_percentage = val)" @update_discount_umount="update_discount_umount" @save-and-clear="save_and_clear_invoice" @load-drafts="get_draft_invoices" @select-order="get_draft_orders" @cancel-sale="cancel_dialog = true" @open-returns="open_returns" @print-draft="print_draft_invoice" @show-payment="show_payment" />
 			</div>
 		</div>
 	</div>
@@ -320,6 +320,20 @@ export default {
 			// Generate headers based on selected columns
 			this.updateHeadersFromSelection();
 		},
+		// Handle item dropped from ItemsSelector to ItemsTable
+		handleStockLimitWarning(item) {
+			const maxQty = item?.max_qty ?? item?.available_qty;
+			const hasQty = maxQty !== undefined && maxQty !== null;
+			const formattedQty = hasQty ? this.formatFloat(maxQty, 0) : null;
+			const uom = item?.uom || "";
+
+			this.eventBus.emit("show_message", {
+				title: __("Maximum available quantity reached"),
+				text: formattedQty ? __('Only {0} {1} available', [formattedQty, uom]) : undefined,
+				color: "warning",
+			});
+		},
+
 		// Handle item dropped from ItemsSelector to ItemsTable
 		handleItemDrop(item) {
 			console.log("Item dropped:", item);

@@ -11,7 +11,7 @@
 			<v-divider class="payments-divider"></v-divider>
 			<v-card-text class="pa-0">
 				<div class="pa-0">
-					<v-card class="selection payments-card mx-auto my-0 mt-3 pos-themed-card">
+					<v-card class="selection payments-card mx-auto my-0 mt-1 pos-themed-card">
 						<v-progress-linear :active="loading" :indeterminate="loading" absolute location="top" color="info"></v-progress-linear>
 						<div ref="paymentContainer" class="payments-body">
 							<div v-if="invoice_doc" class="payment-layout">
@@ -1790,8 +1790,8 @@ export default {
 .payments-card {
 	display: flex;
 	flex-direction: column;
-	padding: 16px;
-	gap: 16px;
+	padding: 14px;
+	gap: 14px;
 }
 
 .payments-body {
@@ -1799,22 +1799,22 @@ export default {
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
-	gap: 24px;
-	padding: 0 8px 24px;
+	gap: 12px;
+	padding: 0 8px 14px;
 	padding-bottom: 140px;
 }
 
 .payment-layout {
 	display: flex;
 	flex-direction: column;
-	gap: 24px;
+	gap: 14px;
 }
 
 .payment-section {
 	background-color: var(--surface-secondary, rgba(255, 255, 255, 0.85));
 	border: 1px solid rgba(var(--v-theme-outline), 0.12);
 	border-radius: 16px;
-	padding: 20px;
+	padding: 14px 16px;
 	box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 	transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -1828,7 +1828,7 @@ export default {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	margin-bottom: 16px;
+	margin-bottom: 8px;
 }
 
 .payment-section__icon {
@@ -1842,8 +1842,14 @@ export default {
 
 .payment-section__content {
 	margin: 0;
-	row-gap: 16px;
-	column-gap: 16px;
+	row-gap: 12px;
+	column-gap: 12px;
+}
+
+.payment-section--summary {
+	position: sticky;
+	top: 8px;
+	z-index: 3;
 }
 
 .payment-method-list {

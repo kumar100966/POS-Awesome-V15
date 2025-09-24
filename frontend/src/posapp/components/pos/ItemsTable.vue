@@ -3,7 +3,12 @@
 		<v-data-table :headers="responsiveHeaders" :items="items" :expanded="expanded" show-expand item-value="posa_row_id" class="pos-table elevation-2 pos-themed-card" :class="tableClasses" :items-per-page="itemsPerPage || -1" expand-on-click :density="tableDensity" hide-default-footer :single-expand="true" :header-props="dynamicHeaderProps" :no-data-text="__('No items in cart')" @update:expanded="handleExpandedUpdate" :search="itemSearch" :custom-filter="customItemFilter">
 			<!-- UOM column -->
 			<template v-slot:item.uom="{ item }">
-				<v-select density="compact" variant="outlined" class="pos-themed-input table-uom-select" v-model="item.uom" :items="item.item_uoms" item-title="uom" item-value="uom" hide-details @update:model-value="calcUom(item, $event)" @click.stop @mousedown.stop :disabled="!!item.posa_is_replace || (isReturnInvoice && invoice_doc.return_against)" prepend-inner-icon="mdi-weight"></v-select>
+				<div class="pos-table__uom-wrapper">
+					<v-select density="compact" variant="outlined" class="pos-themed-input table-uom-select" v-model="item.uom" :items="item.item_uoms" item-title="uom" item-value="uom" hide-details @update:model-value="calcUom(item, $event)" @click.stop @mousedown.stop :disabled="!!item.posa_is_replace || (isReturnInvoice && invoice_doc.return_against)" prepend-inner-icon="mdi-weight"></v-select>
+					<div v-if="availableQtyText(item)" class="pos-table__available-stock">
+						{{ availableQtyText(item) }}
+					</div>
+				</div>
 			</template>
 
 			<!-- Item name column -->
@@ -23,23 +28,23 @@
 
 			<!-- Quantity column -->
 			<template v-slot:item.qty="{ item }">
-					<div class="pos-table__qty-counter" :class="{ 'rtl-layout': isRTL }" :title="`RTL: ${isRTL}`">
+				<div class="pos-table__qty-counter" :class="{ 'rtl-layout': isRTL }" :title="`RTL: ${isRTL}`">
+					<div class="pos-table__qty-btn-wrapper" @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop>
 						<v-btn :disabled="!!item.posa_is_replace" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--minus" @click.stop="handleMinusClick(item)">
 							<v-icon size="small">mdi-minus</v-icon>
 						</v-btn>
-						<div class="pos-table__qty-display amount-value number-field-rtl" :class="{
-							'negative-number': isNegative(item.qty),
-							'large-number': memoizedQtyLength(item.qty) > 6,
-						}" :data-length="memoizedQtyLength(item.qty)" :title="formatFloat(item.qty, 0)">
-							{{ formatFloat(item.qty, 0) }}
 					</div>
-					<v-btn :disabled="!!item.posa_is_replace ||
-						((!stock_settings.allow_negative_stock || blockSaleBeyondAvailableQty) &&
-							item.max_qty !== undefined &&
-							item.qty >= item.max_qty)
-						" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--plus" @click.stop="addOne(item)">
-						<v-icon size="small">mdi-plus</v-icon>
-					</v-btn>
+					<div class="pos-table__qty-display amount-value number-field-rtl" :class="{
+						'negative-number': isNegative(item.qty),
+						'large-number': memoizedQtyLength(item.qty) > 6,
+					}" :data-length="memoizedQtyLength(item.qty)" :title="formatFloat(item.qty, 0)">
+						{{ formatFloat(item.qty, 0) }}
+					</div>
+					<div class="pos-table__qty-btn-wrapper" @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop @click.stop.prevent="handleIncrement(item)">
+						<v-btn :disabled="isIncrementDisabled(item)" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--plus" @click.stop.prevent="handleIncrement(item)">
+							<v-icon size="small">mdi-plus</v-icon>
+						</v-btn>
+					</div>
 				</div>
 			</template>
 
@@ -361,8 +366,9 @@ export default {
 		// Dynamic container styles based on parent
 		containerStyles() {
 			return {
-				height: "calc(100% - 80px)",
-				maxHeight: "calc(100% - 80px)",
+				height: "100%",
+				maxHeight: "100%",
+				minHeight: "100%",
 				"--container-width": this.containerWidth + "px",
 				"--container-height": this.containerHeight + "px",
 			};
@@ -546,6 +552,94 @@ export default {
 		},
 	},
 	methods: {
+		availableQtyPrecision() {
+			if (this.hide_qty_decimals) {
+				return 0;
+			}
+			const parsed = parseInt(this.pos_profile?.uom_precision, 10);
+			return Number.isNaN(parsed) ? 2 : parsed;
+		},
+
+		availableQtyInfo(item) {
+			if (!item) {
+				return null;
+			}
+
+			const maxSource = item.max_qty ?? item.available_qty;
+			if (maxSource === undefined || maxSource === null) {
+				return null;
+			}
+
+			const precision = this.availableQtyPrecision();
+			const maxQty = Number(maxSource);
+			if (!Number.isFinite(maxQty)) {
+				return null;
+			}
+
+			const currentQty = Number(item.qty || 0);
+			const remaining = Math.max(0, maxQty - currentQty);
+
+			return {
+				precision,
+				remaining,
+				total: maxQty,
+				formattedRemaining: this.formatFloat(remaining, precision),
+				formattedTotal: this.formatFloat(Math.max(maxQty, 0), precision),
+			};
+		},
+
+		availableQtyText(item) {
+			const info = this.availableQtyInfo(item);
+			if (!info) {
+				return "";
+			}
+
+			const epsilon = info.precision ? Math.pow(10, -info.precision) : 1;
+			const difference = Math.abs(info.total - info.remaining);
+			const hasConsumption = difference >= epsilon && info.total > 0;
+			if (hasConsumption) {
+				return __('Available: {0} {1} (of {2} {1})', [
+					info.formattedRemaining,
+					item.uom || "",
+					info.formattedTotal,
+				]);
+			}
+			return __('Available: {0} {1}', [info.formattedRemaining, item.uom || ""]);
+		},
+
+		isIncrementDisabled(item) {
+			if (!item) {
+				return false;
+			}
+
+			const blockedByReplace = !!item.posa_is_replace;
+			const flaggedDisabled = !!item.disable_increment;
+			const stockSettings = this.stock_settings || {};
+			const blockSale = !stockSettings.allow_negative_stock || this.blockSaleBeyondAvailableQty;
+			const hasMaxDefined = item.max_qty !== undefined && item.max_qty !== null;
+			const qty = Number(item.qty) || 0;
+			const maxQty = hasMaxDefined ? Number(item.max_qty) : 0;
+			const exceedsAvailable = blockSale && hasMaxDefined && Number.isFinite(maxQty) && qty >= maxQty;
+
+			return blockedByReplace || flaggedDisabled || exceedsAvailable;
+		},
+
+		handleIncrement(item) {
+			if (this.isIncrementDisabled(item)) {
+				const stockSettings = this.stock_settings || {};
+				const blockSale = !stockSettings.allow_negative_stock || this.blockSaleBeyondAvailableQty;
+				const hasMaxDefined = item && item.max_qty !== undefined && item.max_qty !== null;
+				const qty = Number(item?.qty) || 0;
+				const maxQty = hasMaxDefined ? Number(item.max_qty) : 0;
+				if (blockSale && hasMaxDefined && Number.isFinite(maxQty) && qty >= maxQty) {
+					this.$emit('stock-limit-reached', item);
+				}
+				return;
+			}
+
+			this.addOne(item);
+		},
+
 		customItemFilter(value, search, item) {
 			if (search == null) {
 				return true;
@@ -900,6 +994,12 @@ export default {
 	padding: 0;
 }
 
+.pos-table :deep(.v-data-table__wrapper) {
+	flex: 1 1 auto;
+	max-height: 100%;
+	min-height: 0;
+}
+
 /* Ensure items table can scroll when many rows exist */
 .items-table-container {
 	overflow-y: auto;
@@ -908,12 +1008,51 @@ export default {
 	margin: 0;
 	padding: 0;
 	box-sizing: border-box;
+	height: 100%;
 }
 
 .table-uom-select {
 	min-width: 140px;
 	max-width: 200px;
 	width: 100% !important;
+}
+
+.pos-table__uom-wrapper {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: space-between;
+	gap: 4px;
+	min-height: 64px;
+	padding-bottom: 4px;
+}
+
+.pos-table__available-stock {
+	font-size: 0.75rem;
+	line-height: 1.2;
+	color: var(--pos-text-secondary, rgba(0, 0, 0, 0.54));
+	text-align: start;
+	min-height: 0.75rem;
+	padding-bottom: 2px;
+}
+
+.pos-table__qty-btn-wrapper {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.pos-table :deep(.v-data-table__tbody > tr) {
+	min-height: 80px;
+}
+
+.pos-table :deep(.v-data-table__tbody > tr > td) {
+	padding-top: 16px !important;
+	padding-bottom: 16px !important;
+}
+
+.pos-table :deep(.v-data-table__tbody > tr > td .pos-table__qty-counter) {
+	min-height: 40px;
 }
 
 /* Improve item name column display */
