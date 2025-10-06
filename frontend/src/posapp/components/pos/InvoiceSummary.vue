@@ -6,22 +6,21 @@
 		<div class="summary-section summary-totals">
 			<v-row dense>
 				<!-- Total Qty -->
-				<v-col cols="12" sm="6">
-					<v-text-field
-						:model-value="formatFloat(total_qty, hide_qty_decimals ? 0 : undefined)"
-						:label="frappe._('Total Qty')"
-						prepend-inner-icon="mdi-format-list-numbered"
-						variant="solo"
-						density="compact"
-						readonly
-						color="accent"
-					/>
+				<v-col cols="12" class="summary-metric-col">
+					<div class="summary-metric-card">
+						<v-icon size="20" class="summary-metric-card__icon">mdi-format-list-numbered</v-icon>
+						<div class="summary-metric-card__label">{{ frappe._('Total Qty') }}</div>
+						<div class="summary-metric-card__value">
+							{{ formatFloat(total_qty, hide_qty_decimals ? 0 : undefined) }}
+						</div>
+					</div>
 				</v-col>
 				<!-- Additional Discount (Amount or Percentage) -->
-				<v-col cols="12" sm="6" v-if="!pos_profile.posa_use_percentage_discount">
+				<v-col cols="12" v-if="!pos_profile.posa_use_percentage_discount">
 					<v-text-field
 						:model-value="additional_discount"
 						@update:model-value="handleAdditionalDiscountUpdate"
+						@focus="handleAdditionalDiscountFocus"
 						:label="frappe._('Additional Discount')"
 						prepend-inner-icon="mdi-cash-minus"
 						variant="solo"
@@ -32,15 +31,31 @@
 							!pos_profile.posa_allow_user_to_edit_additional_discount ||
 							!!discount_percentage_offer_name
 						"
-						class="summary-field"
-					/>
+						class="summary-field summary-field--metric"
+					>
+						<template #append-inner>
+							<v-btn
+								icon
+								size="large"
+								class="touch-keypad-btn"
+								:disabled="
+									!pos_profile.posa_allow_user_to_edit_additional_discount ||
+									!!discount_percentage_offer_name
+								"
+								@click.stop="openAdditionalDiscountKeypad"
+							>
+								<v-icon size="28">mdi-dialpad</v-icon>
+							</v-btn>
+						</template>
+					</v-text-field>
 				</v-col>
 
-				<v-col cols="12" sm="6" v-else>
+				<v-col cols="12" v-else>
 					<v-text-field
 						:model-value="additional_discount_percentage"
 						@update:model-value="handleAdditionalDiscountPercentageUpdate"
 						@change="$emit('update_discount_umount')"
+						@focus="handleAdditionalDiscountPercentageFocus"
 						:rules="[isNumber]"
 						:label="frappe._('Additional Discount %')"
 						suffix="%"
@@ -52,27 +67,27 @@
 							!pos_profile.posa_allow_user_to_edit_additional_discount ||
 							!!discount_percentage_offer_name
 						"
-						class="summary-field"
-					/>
-				</v-col>
-
-				<!-- Items Discount -->
-				<v-col cols="12" sm="6">
-					<v-text-field
-						:model-value="formatCurrency(total_items_discount_amount)"
-						:prefix="currencySymbol(displayCurrency)"
-						:label="frappe._('Items Discounts')"
-						prepend-inner-icon="mdi-tag-minus"
-						variant="solo"
-						density="compact"
-						color="warning"
-						readonly
-						class="summary-field"
-					/>
+						class="summary-field summary-field--metric"
+					>
+						<template #append-inner>
+							<v-btn
+								icon
+								size="large"
+								class="touch-keypad-btn"
+								:disabled="
+									!pos_profile.posa_allow_user_to_edit_additional_discount ||
+									!!discount_percentage_offer_name
+								"
+								@click.stop="openAdditionalDiscountPercentageKeypad"
+							>
+								<v-icon size="28">mdi-dialpad</v-icon>
+							</v-btn>
+						</template>
+					</v-text-field>
 				</v-col>
 
 				<!-- Total -->
-				<v-col cols="12" sm="6">
+				<v-col cols="12">
 					<v-text-field
 						:model-value="formatCurrency(subtotal)"
 						:prefix="currencySymbol(displayCurrency)"
@@ -82,37 +97,10 @@
 						density="compact"
 						readonly
 						color="success"
-						class="summary-field"
+						class="summary-field summary-field--metric"
 					/>
 				</v-col>
 
-				<v-col cols="12" sm="6">
-					<v-text-field
-						:model-value="formatCurrency(normalizedTaxTotal)"
-						:prefix="currencySymbol(displayCurrency)"
-						:label="frappe._('Tax')"
-						prepend-inner-icon="mdi-receipt"
-						variant="solo"
-						density="compact"
-						readonly
-						color="secondary"
-						class="summary-field"
-					/>
-				</v-col>
-
-				<v-col cols="12" sm="6">
-					<v-text-field
-						:model-value="formatCurrency(normalizedGrandTotal)"
-						:prefix="currencySymbol(displayCurrency)"
-						:label="frappe._('Grand Total')"
-						prepend-inner-icon="mdi-cash-plus"
-						variant="solo"
-						density="compact"
-						readonly
-						color="primary"
-						class="summary-field"
-					/>
-				</v-col>
 			</v-row>
 		</div>
 
@@ -215,10 +203,29 @@
 			</v-row>
 		</div>
 	</v-card>
+	<NumericKeypad
+		:visible="numericKeypad.visible"
+		:model-value="numericKeypad.value"
+		:title="numericKeypad.title"
+		:helper-text="numericKeypad.helperText"
+		:allow-decimal="numericKeypad.allowDecimal"
+		:allow-negative="numericKeypad.allowNegative"
+		:decimal-places="numericKeypad.decimalPlaces"
+		@update:modelValue="(val) => (numericKeypad.value = val)"
+		@update:visible="(val) => (numericKeypad.visible = val)"
+		@confirm="handleNumericKeypadConfirm"
+		@cancel="closeNumericKeypad"
+	/>
 </template>
 
 <script>
+import { formatUtils } from "../../format";
+import NumericKeypad from "./NumericKeypad.vue";
+
 export default {
+	components: {
+		NumericKeypad,
+	},
 	props: {
 		pos_profile: Object,
 		total_qty: [Number, String],
@@ -251,6 +258,17 @@ export default {
 			returnsLoading: false,
 			printLoading: false,
 			paymentLoading: false,
+			prefersTouchKeypad: false,
+			numericKeypad: {
+				visible: false,
+				value: "0",
+				title: "",
+				helperText: "",
+				allowDecimal: true,
+				allowNegative: false,
+				decimalPlaces: 2,
+				apply: null,
+			},
 		};
 	},
 	emits: [
@@ -278,21 +296,89 @@ export default {
 			}
 			return false;
 		},
-		normalizedTaxTotal() {
-			const value = parseFloat(this.taxTotal);
-			return Number.isNaN(value) ? 0 : value;
-		},
-
-		normalizedGrandTotal() {
-			const value = parseFloat(this.grandTotal);
-			if (!Number.isNaN(value)) {
-				return value;
-			}
-			const fallback = parseFloat(this.subtotal);
-			return Number.isNaN(fallback) ? 0 : fallback;
-		},
 	},
 	methods: {
+		openNumericKeypad({
+			initialValue = 0,
+			title = __("Enter Value"),
+			helperText = "",
+			allowDecimal = true,
+			allowNegative = false,
+			decimalPlaces = null,
+			onConfirm = null,
+		}) {
+			const defaultPrecision = Number(this.pos_profile?.currency_precision ?? 2);
+			const precision = Number.isFinite(Number(decimalPlaces))
+				? Number(decimalPlaces)
+				: defaultPrecision;
+			this.numericKeypad.title = title;
+			this.numericKeypad.helperText = helperText;
+			this.numericKeypad.allowDecimal = allowDecimal;
+			this.numericKeypad.allowNegative = allowNegative;
+			this.numericKeypad.decimalPlaces = precision;
+			this.numericKeypad.apply = typeof onConfirm === "function" ? onConfirm : null;
+			this.numericKeypad.value = this.prepareKeypadValue(initialValue, precision);
+			this.numericKeypad.visible = true;
+		},
+		closeNumericKeypad() {
+			this.numericKeypad.visible = false;
+			this.numericKeypad.apply = null;
+		},
+		handleNumericKeypadConfirm(rawValue) {
+			const precision = this.numericKeypad.decimalPlaces ?? Number(this.pos_profile?.currency_precision ?? 2);
+			const numericValue = this.parseKeypadNumber(rawValue, precision);
+			if (typeof this.numericKeypad.apply === "function") {
+				this.numericKeypad.apply(numericValue);
+			}
+			this.closeNumericKeypad();
+		},
+		prepareKeypadValue(value, precision = 2) {
+			const numeric = this.parseKeypadNumber(value, precision);
+			const fixed = precision > 0 ? Number(numeric.toFixed(precision)) : numeric;
+			return String(fixed).replace(/^-0$/, "0");
+		},
+		parseKeypadNumber(value, precision = 2) {
+			const parsed = parseFloat(formatUtils.fromArabicNumerals(String(value ?? 0)));
+			if (Number.isNaN(parsed)) {
+				return 0;
+			}
+			const factor = Math.pow(10, precision);
+			return Math.round(parsed * factor) / factor;
+		},
+		openAdditionalDiscountKeypad() {
+			const precision = Number(this.pos_profile?.currency_precision ?? 2);
+			this.openNumericKeypad({
+				initialValue: this.additional_discount || 0,
+				title: __("Set Additional Discount"),
+				decimalPlaces: precision,
+				onConfirm: (value) => {
+					const sanitized = Math.max(0, value);
+					this.handleAdditionalDiscountUpdate(sanitized);
+				},
+			});
+		},
+		openAdditionalDiscountPercentageKeypad() {
+			this.openNumericKeypad({
+				initialValue: this.additional_discount_percentage || 0,
+				title: __("Set Additional Discount %"),
+				decimalPlaces: 2,
+				onConfirm: (value) => {
+					const sanitized = Math.max(0, Math.min(100, value));
+					this.handleAdditionalDiscountPercentageUpdate(sanitized);
+					this.$emit("update_discount_umount");
+				},
+			});
+		},
+		handleAdditionalDiscountFocus() {
+			if (this.prefersTouchKeypad) {
+				this.openAdditionalDiscountKeypad();
+			}
+		},
+		handleAdditionalDiscountPercentageFocus() {
+			if (this.prefersTouchKeypad) {
+				this.openAdditionalDiscountPercentageKeypad();
+			}
+		},
 		// Debounced handlers for better performance
 		handleAdditionalDiscountUpdate(value) {
 			this.$emit("update:additional_discount", value);
@@ -365,6 +451,19 @@ export default {
 			}
 		},
 	},
+	mounted() {
+		if (typeof window !== "undefined") {
+			try {
+				const coarse = window.matchMedia?.("(pointer: coarse)")?.matches;
+				this.prefersTouchKeypad = Boolean(coarse || "ontouchstart" in window);
+			} catch (err) {
+				this.prefersTouchKeypad = false;
+			}
+		}
+	},
+	beforeUnmount() {
+		this.closeNumericKeypad();
+	},
 };
 </script>
 
@@ -388,12 +487,17 @@ export default {
 	position: relative;
 	overflow: hidden;
 	color: #fff !important;
+	min-height: 56px !important;
+	font-size: 1.05rem !important;
+	padding: 14px 18px !important;
+	border-radius: 14px !important;
 }
 
 .summary-btn :deep(.v-btn__content) {
 	white-space: normal !important;
 	transition: all 0.2s ease;
 	color: inherit !important;
+	font-weight: 600;
 }
 
 .summary-btn:hover {
@@ -444,10 +548,70 @@ export default {
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.touch-keypad-btn {
+	min-width: 44px !important;
+	height: 44px !important;
+	border-radius: 12px !important;
+}
+
+.touch-keypad-btn :deep(.v-icon) {
+	font-size: 28px !important;
+}
+
+.summary-field--metric :deep(.v-field__input) {
+	font-size: 1.25rem !important;
+	font-weight: 600 !important;
+}
+
+.summary-field--metric :deep(.v-field__label) {
+	font-size: 1rem !important;
+	font-weight: 500 !important;
+}
+
+.summary-metric-col {
+	margin-bottom: 6px;
+}
+
+.summary-metric-card {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 16px 18px;
+	border-radius: 14px;
+	background: rgba(var(--v-theme-surface), 0.95);
+	border: 1px solid rgba(var(--v-theme-outline), 0.16);
+	box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+	width: 100%;
+}
+
+.summary-metric-card__icon {
+	color: rgba(var(--v-theme-primary));
+}
+
+.summary-metric-card__label {
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: rgba(var(--v-theme-on-surface), 0.68);
+}
+
+.summary-metric-card__value {
+	font-size: 2rem;
+	font-weight: 700;
+	color: rgba(var(--v-theme-primary));
+	letter-spacing: -0.03em;
+}
+
 .summary-section {
 	display: flex;
 	flex-direction: column;
 	gap: var(--dynamic-sm);
+}
+
+.summary-totals :deep(.v-row) {
+	display: flex;
+	flex-direction: column;
+	row-gap: 10px;
 }
 
 .summary-section :deep(.v-row) {

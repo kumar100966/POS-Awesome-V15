@@ -839,6 +839,7 @@ export default {
 			// When offline, simply merge the passed doc with the current invoice_doc
 			// to allow offline invoice creation without server calls
 			vm.invoice_doc = Object.assign({}, vm.invoice_doc || {}, doc);
+			vm.eventBus.emit("refresh_invoice_totals", vm.invoice_doc);
 			return vm.invoice_doc;
 		}
 		frappe.call({
@@ -870,6 +871,7 @@ export default {
 							});
 						}
 					}
+					vm.eventBus.emit("refresh_invoice_totals", vm.invoice_doc);
 				}
 			},
 		});
@@ -882,6 +884,7 @@ export default {
 		if (isOffline()) {
 			// Offline mode - merge doc locally without server update
 			vm.invoice_doc = Object.assign({}, vm.invoice_doc || {}, doc);
+			vm.eventBus.emit("refresh_invoice_totals", vm.invoice_doc);
 			return vm.invoice_doc;
 		}
 		frappe.call({
@@ -908,6 +911,7 @@ export default {
 							});
 						}
 					}
+					vm.eventBus.emit("refresh_invoice_totals", vm.invoice_doc);
 				}
 			},
 		});

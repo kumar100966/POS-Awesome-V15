@@ -1,12 +1,12 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-	<v-dialog v-model="showModal" max-width="95vw" max-height="95vh" persistent scrollable :fullscreen="$vuetify.display.mobile" attach="body">
+	<v-dialog v-model="showModal" max-width="95vw" max-height="95vh" persistent :fullscreen="$vuetify.display.mobile" attach="body">
 		<v-card class="payments-modal">
-			<v-card-title class="d-flex align-center px-4 py-3">
-				<v-icon class="mr-3">mdi-credit-card</v-icon>
-				<span class="text-h6">{{ __("Payment") }}</span>
-				<v-spacer></v-spacer>
-				<v-btn icon="mdi-close" variant="text" @click="back_to_invoice"></v-btn>
+				<v-card-title class="d-flex align-center px-4 py-3">
+					<v-icon class="mr-3">mdi-credit-card</v-icon>
+					<span class="text-h6">{{ __("Payment") }}</span>
+					<v-spacer></v-spacer>
+					<v-btn icon="mdi-close" variant="text" class="icon-close-btn" @click="back_to_invoice"></v-btn>
 			</v-card-title>
 			<v-divider class="payments-divider"></v-divider>
 			<v-card-text class="pa-0">
@@ -21,14 +21,20 @@
 										<span class="payment-section__title">{{ __("Payment Summary") }}</span>
 									</div>
 									<v-row class="payment-section__content" dense>
-										<v-col cols="12" md="4">
+										<v-col cols="12" md="6" lg="4">
 											<v-text-field variant="solo" color="primary" :label="frappe._('Paid Amount')" class="sleek-field pos-themed-input read-only-field" hide-details :model-value="total_payments_display" readonly :prefix="currencySymbol(invoice_doc.currency)" density="compact" @click="showPaidAmount"></v-text-field>
 										</v-col>
-										<v-col cols="12" md="4">
+										<v-col cols="12" md="6" lg="4">
 											<v-text-field variant="solo" color="primary" :label="diff_label" class="sleek-field pos-themed-input read-only-field" hide-details :model-value="diff_payment_display" readonly :prefix="currencySymbol(invoice_doc.currency)" density="compact" @click="showDiffPayment"></v-text-field>
 										</v-col>
-										<v-col cols="12" md="4">
-											<v-text-field variant="solo" color="primary" :label="frappe._('Grand Total')" class="sleek-field pos-themed-input read-only-field" hide-details :model-value="formatCurrency(invoice_doc.rounded_total || invoice_doc.grand_total)" readonly :prefix="currencySymbol(invoice_doc.currency)" density="compact"></v-text-field>
+										<v-col cols="12" md="6" lg="4">
+											<v-text-field variant="solo" color="primary" :label="frappe._('Discount')" class="sleek-field pos-themed-input read-only-field" hide-details :model-value="paymentDiscountDisplay" readonly :prefix="currencySymbol(invoice_doc.currency)" density="compact"></v-text-field>
+										</v-col>
+										<v-col cols="12" md="6" lg="4">
+											<v-text-field variant="solo" color="primary" :label="frappe._('VAT Total')" class="sleek-field pos-themed-input read-only-field" hide-details :model-value="paymentTaxDisplay" readonly :prefix="currencySymbol(invoice_doc.currency)" density="compact"></v-text-field>
+										</v-col>
+										<v-col cols="12" md="6" lg="4">
+											<v-text-field variant="solo" color="primary" :label="frappe._('Grand Total')" class="sleek-field pos-themed-input read-only-field" hide-details :model-value="invoiceTotalDisplay" readonly :prefix="currencySymbol(invoice_doc.currency)" density="compact"></v-text-field>
 										</v-col>
 									</v-row>
 								</section>
@@ -53,22 +59,38 @@
 													</v-chip>
 												</div>
 												<div class="payment-method-card__meta">
-													<span v-if="payment.account">{{ payment.account }}</span>
-													<span v-else-if="payment.type">{{ __(payment.type) }}</span>
+													<span v-if="payment.type">{{ __(payment.type) }}</span>
+													<span v-else-if="payment.account">{{ payment.account }}</span>
 												</div>
 											</div>
 											<v-row class="payment-method-card__content" dense>
 												<v-col cols="12" md="4">
-											<v-text-field v-if="payment.type !== 'Phone'" variant="outlined" color="primary" :label="frappe._('Amount')" class="pos-themed-input editable-field" hide-details density="compact" :prefix="currencySymbol(displayCurrency)" type="number" v-model="payment.amount" @focus="set_rest_amount(payment)" @blur="normalizePaymentAmount(payment)"></v-text-field>
+												<v-text-field
+													v-if="payment.type !== 'Phone'"
+													variant="outlined"
+													color="primary"
+													:label="frappe._('Amount')"
+													class="pos-themed-input editable-field"
+													hide-details
+													density="compact"
+													:prefix="currencySymbol(displayCurrency)"
+													type="number"
+													inputmode="decimal"
+													v-model="payment.amount"
+													:append-inner-icon="'mdi-dialpad'"
+													@click:append-inner="openPaymentAmountKeypad(payment)"
+													@focus="handlePaymentAmountFocus(payment)"
+													@blur="normalizePaymentAmount(payment)"
+												></v-text-field>
 													<v-text-field v-else variant="solo" color="primary" :label="frappe._('Amount')" class="sleek-field pos-themed-input read-only-field" hide-details density="compact" :model-value="formatCurrency(payment.amount || 0)" :prefix="currencySymbol(displayCurrency)" readonly></v-text-field>
 												</v-col>
 												<v-col cols="12" md="8">
 													<div class="payment-method-card__actions">
-											<v-btn variant="tonal" size="small" color="primary" @click="set_rest_amount(payment)" :disabled="(!invoice_doc || !invoice_doc.is_return) && diff_payment <= 0">
+														<v-btn variant="tonal" size="small" color="primary" @click="set_rest_amount(payment)" :disabled="(!invoice_doc || !invoice_doc.is_return) && diff_payment <= 0">
 															<v-icon size="small" class="mr-1">mdi-target</v-icon>
 															{{ __("Set Remaining") }}
 														</v-btn>
-											<v-btn variant="tonal" size="small" color="secondary" @click="set_full_amount(payment)" :disabled="!canSetFullAmount">
+														<v-btn variant="tonal" size="small" color="secondary" @click="set_full_amount(payment)" :disabled="!canSetFullAmount">
 															<v-icon size="small" class="mr-1">mdi-cash</v-icon>
 															{{ __("Full Amount") }}
 														</v-btn>
@@ -97,7 +119,23 @@
 									</div>
 									<v-row class="payment-section__content" dense>
 										<v-col cols="12" md="4">
-											<v-text-field variant="outlined" color="primary" :label="frappe._('Paid Change')" class="pos-themed-input editable-field" hide-details density="compact" :prefix="currencySymbol(displayCurrency)" type="number" v-model="paid_change" :rules="paid_change_rules" @focus="onPaidChangeFocus" @blur="onPaidChangeBlur"></v-text-field>
+											<v-text-field
+												variant="outlined"
+												color="primary"
+												:label="frappe._('Paid Change')"
+												class="pos-themed-input editable-field"
+												hide-details
+												density="compact"
+												:prefix="currencySymbol(displayCurrency)"
+												type="number"
+												inputmode="decimal"
+												v-model="paid_change"
+												:rules="paid_change_rules"
+												:append-inner-icon="'mdi-dialpad'"
+												@click:append-inner="openPaidChangeKeypad"
+												@focus="onPaidChangeFocus"
+												@blur="onPaidChangeBlur"
+											></v-text-field>
 										</v-col>
 										<v-col cols="12" md="4">
 											<v-text-field variant="solo" color="primary" :label="frappe._('Credit Change')" class="sleek-field pos-themed-input read-only-field" hide-details density="compact" :prefix="currencySymbol(displayCurrency)" :model-value="formatCurrency(credit_change || 0)" readonly></v-text-field>
@@ -119,7 +157,22 @@
 									</div>
 									<v-row v-if="customer_info && customer_info.loyalty_points !== undefined" class="payment-section__content" dense>
 										<v-col cols="12" md="6">
-											<v-text-field variant="outlined" color="primary" :label="frappe._('Redeem Loyalty Amount')" class="pos-themed-input editable-field" hide-details density="compact" v-model="loyalty_amount" :prefix="currencySymbol(displayCurrency)" :hint="__('Available: {0}', [formatCurrency(available_points_amount || 0)])" persistent-hint></v-text-field>
+											<v-text-field
+												variant="outlined"
+												color="primary"
+												:label="frappe._('Redeem Loyalty Amount')"
+												class="pos-themed-input editable-field"
+												hide-details
+												density="compact"
+												type="number"
+												inputmode="decimal"
+												v-model="loyalty_amount"
+												:prefix="currencySymbol(displayCurrency)"
+												:hint="__('Available: {0}', [formatCurrency(available_points_amount || 0)])"
+												persistent-hint
+												:append-inner-icon="'mdi-dialpad'"
+												@click:append-inner="openLoyaltyKeypad"
+											></v-text-field>
 										</v-col>
 									</v-row>
 									<div v-if="pos_profile.use_customer_credit" class="payment-credit-toggle">
@@ -131,7 +184,21 @@
 												<strong>{{ credit.credit_origin || __('Advance') }}</strong>
 												<span>{{ __('Available') }}: {{ formatCurrency(credit.total_credit || 0) }}</span>
 											</div>
-											<v-text-field variant="outlined" color="primary" :label="frappe._('Amount to Redeem')" class="pos-themed-input editable-field" hide-details density="compact" :prefix="currencySymbol(displayCurrency)" v-model="credit.credit_to_redeem" @blur="normalizeCustomerCredit(credit)"></v-text-field>
+											<v-text-field
+												variant="outlined"
+												color="primary"
+												:label="frappe._('Amount to Redeem')"
+												class="pos-themed-input editable-field"
+												hide-details
+												density="compact"
+												:prefix="currencySymbol(displayCurrency)"
+												type="number"
+												inputmode="decimal"
+												v-model="credit.credit_to_redeem"
+												:append-inner-icon="'mdi-dialpad'"
+												@click:append-inner="openCustomerCreditKeypad(credit)"
+												@blur="normalizeCustomerCredit(credit)"
+											></v-text-field>
 										</div>
 										<div v-if="!customer_credit_dict.length" class="customer-credit-empty">
 											{{ __("No customer credit available") }}
@@ -144,16 +211,16 @@
 										<span class="payment-section__title">{{ __("Additional Details") }}</span>
 									</div>
 									<v-row class="payment-section__content" dense>
-										<v-col v-if="showOrderDetails" cols="12" md="6" lg="4">
+										<v-col v-if="showSalesPersonField" cols="12" md="6" lg="4">
 											<v-autocomplete variant="outlined" color="primary" :label="frappe._('Sales Person')" class="pos-themed-input editable-field" hide-details density="compact" :items="sales_persons" item-title="title" item-value="value" clearable v-model="sales_person"></v-autocomplete>
 										</v-col>
-										<v-col v-if="showOrderDetails" cols="12" md="6" lg="4">
+										<v-col v-if="showDeliveryDateField" cols="12" md="6" lg="4">
 											<v-text-field variant="outlined" color="primary" :label="frappe._('Delivery Date')" class="pos-themed-input editable-field" hide-details density="compact" type="date" :model-value="formatDateInput(new_delivery_date || invoice_doc.posa_delivery_date)" @update:model-value="handleDeliveryDate"></v-text-field>
 										</v-col>
 										<v-col v-if="showCreditDueDateField" cols="12" md="6" lg="4">
 											<v-text-field variant="outlined" color="primary" :label="frappe._('Purchase Order Date')" class="pos-themed-input editable-field" hide-details density="compact" type="date" :model-value="formatDateInput(new_po_date || invoice_doc.po_date)" @update:model-value="handlePODate"></v-text-field>
 										</v-col>
-										<v-col cols="12" md="6" lg="4">
+										<v-col v-if="showCreditDueDateField" cols="12" md="6" lg="4">
 											<v-text-field variant="outlined" color="primary" :label="frappe._('Credit Due Date')" class="pos-themed-input editable-field" hide-details density="compact" type="date" :model-value="formatDateInput(new_credit_due_date || invoice_doc.due_date)" @update:model-value="handleCreditDueDate"></v-text-field>
 											<div class="credit-presets" v-if="credit_due_presets && credit_due_presets.length">
 												<v-chip v-for="preset in credit_due_presets" :key="`preset-${preset}`" size="small" variant="outlined" color="primary" class="mr-2 mb-2" @click="applyDuePreset(preset)">
@@ -182,19 +249,19 @@
 					</v-card>
 					<!-- Action Buttons -->
 					<v-card flat class="cards payments-actions mb-0 mt-3">
-						<v-row align="start" no-gutters>
-							<v-col cols="6">
-								<v-btn ref="submitButton" block size="large" color="primary" theme="dark" class="submit-btn" @click="submit" :loading="loading" :disabled="loading || vaildatPayment" :class="{ 'submit-highlight': highlightSubmit }">
+						<v-row class="payments-actions-row" align="stretch" dense>
+							<v-col cols="12" md="4">
+								<v-btn ref="submitButton" block size="large" color="primary" theme="dark" class="submit-btn payments-actions-btn" @click="submit" :loading="loading" :disabled="loading || vaildatPayment" :class="{ 'submit-highlight': highlightSubmit }">
 									{{ __("Submit") }}
 								</v-btn>
 							</v-col>
-							<v-col cols="6" class="pl-1">
-								<v-btn block size="large" color="success" theme="dark" class="payment-action-btn" @click="submit(undefined, false, true)" :loading="loading" :disabled="loading || vaildatPayment">
+							<v-col cols="12" md="4">
+								<v-btn block size="large" color="success" theme="dark" class="payment-action-btn payments-actions-btn" @click="submit(undefined, false, true)" :loading="loading" :disabled="loading || vaildatPayment">
 									{{ __("Submit & Print") }}
 								</v-btn>
 							</v-col>
-							<v-col cols="12">
-								<v-btn block class="mt-2 pa-1 payment-action-btn" size="large" color="error" theme="dark" @click="back_to_invoice">
+							<v-col cols="12" md="4">
+								<v-btn block size="large" color="error" theme="dark" class="payment-action-btn payments-actions-btn" @click="back_to_invoice">
 									{{ __("Cancel Payment") }}
 								</v-btn>
 							</v-col>
@@ -208,7 +275,7 @@
 							</v-card-title>
 							<v-card-text class="pa-0">
 								<v-container>
-									<v-text-field density="compact" variant="solo" type="number" min="0" max="365" class="sleek-field pos-themed-input" v-model.number="custom_days_value" :label="frappe._('Days')" hide-details></v-text-field>
+									<v-text-field density="compact" variant="solo" type="number" inputmode="numeric" min="0" max="365" class="sleek-field pos-themed-input" v-model.number="custom_days_value" :label="frappe._('Days')" hide-details></v-text-field>
 								</v-container>
 							</v-card-text>
 							<v-card-actions>
@@ -231,7 +298,7 @@
 							</v-card-title>
 							<v-card-text class="pa-0">
 								<v-container>
-									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Mobile Number')" class="sleek-field pos-themed-input" hide-details v-model="invoice_doc.contact_mobile" type="number"></v-text-field>
+									<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Mobile Number')" class="sleek-field pos-themed-input" hide-details v-model="invoice_doc.contact_mobile" type="tel" inputmode="tel"></v-text-field>
 								</v-container>
 							</v-card-text>
 							<v-card-actions>
@@ -248,6 +315,19 @@
 				</div>
 			</v-card-text>
 		</v-card>
+		<NumericKeypad
+			:visible="numericKeypad.visible"
+			:model-value="numericKeypad.value"
+			:title="numericKeypad.title"
+			:helper-text="numericKeypad.helperText"
+			:allow-decimal="numericKeypad.allowDecimal"
+			:allow-negative="numericKeypad.allowNegative"
+			:decimal-places="numericKeypad.decimalPlaces"
+			@update:modelValue="(val) => (numericKeypad.value = val)"
+			@update:visible="(val) => (numericKeypad.visible = val)"
+			@confirm="handleNumericKeypadConfirm"
+			@cancel="closeNumericKeypad"
+		/>
 	</v-dialog>
 </template>
 
@@ -267,9 +347,11 @@ import {
 
 import renderOfflineInvoiceHTML from "../../../offline_print_template";
 import { silentPrint } from "../../plugins/print.js";
+import NumericKeypad from "./NumericKeypad.vue";
 
 export default {
 	// Using format mixin for shared formatting methods
+	components: { NumericKeypad },
 	mixins: [format],
 	data() {
 		return {
@@ -307,6 +389,17 @@ export default {
 			addresses: [], // List of customer addresses
 			is_user_editing_paid_change: false, // User interaction flag
 			highlightSubmit: false, // Highlight state for submit button
+			prefersTouchKeypad: false,
+			numericKeypad: {
+				visible: false,
+				value: "0",
+				title: "",
+				helperText: "",
+				allowDecimal: true,
+				allowNegative: false,
+				decimalPlaces: 2,
+				apply: null,
+			},
 		};
 	},
 	computed: {
@@ -319,6 +412,28 @@ export default {
 		// Display currency for invoice
 		displayCurrency() {
 			return this.invoice_doc ? this.invoice_doc.currency : "";
+		},
+		isRoundedTotalDisabled() {
+			const flag = this.pos_profile?.disable_rounded_total;
+			if (flag === undefined || flag === null) {
+				return false;
+			}
+			if (typeof flag === "boolean") {
+				return flag;
+			}
+			if (typeof flag === "string") {
+				return flag === "1" || flag.toLowerCase() === "true";
+			}
+			return Number(flag) === 1;
+		},
+		invoiceTotalRaw() {
+			return this.resolveInvoiceTotal(this.invoice_doc);
+		},
+		invoiceTotal() {
+			return this.flt(this.invoiceTotalRaw, this.currency_precision);
+		},
+		invoiceTotalDisplay() {
+			return this.formatCurrency(this.invoiceTotal, this.displayCurrency);
 		},
 		blockSaleBeyondAvailableQty() {
 			return (
@@ -373,24 +488,9 @@ export default {
 		diff_payment() {
 			if (!this.invoice_doc) return 0;
 
-			// For multi-currency, use grand_total instead of rounded_total
-			let invoice_total;
-			if (
-				this.pos_profile.posa_allow_multi_currency &&
-				this.invoice_doc.currency !== this.pos_profile.currency
-			) {
-				invoice_total = this.flt(this.invoice_doc.grand_total, this.currency_precision);
-			} else {
-				invoice_total = this.flt(
-					this.invoice_doc.rounded_total || this.invoice_doc.grand_total,
-					this.currency_precision,
-				);
-			}
-
-			// Calculate difference (all amounts are in selected currency)
+			const invoice_total = this.invoiceTotal;
 			let diff = this.flt(invoice_total - this.total_payments, this.currency_precision);
 
-			// For returns, ensure difference is not negative
 			if (this.invoice_doc.is_return) {
 				return diff >= 0 ? diff : 0;
 			}
@@ -400,24 +500,8 @@ export default {
 
 		// Calculate change to be given back to customer
 		credit_change() {
-			// For multi-currency, use grand_total instead of rounded_total
-			let invoice_total;
-			if (
-				this.pos_profile.posa_allow_multi_currency &&
-				this.invoice_doc.currency !== this.pos_profile.currency
-			) {
-				invoice_total = this.flt(this.invoice_doc.grand_total, this.currency_precision);
-			} else {
-				invoice_total = this.flt(
-					this.invoice_doc.rounded_total || this.invoice_doc.grand_total,
-					this.currency_precision,
-				);
-			}
-
-			// Calculate change (all amounts are in selected currency)
+			const invoice_total = this.invoiceTotal;
 			let change = this.flt(this.total_payments - invoice_total, this.currency_precision);
-
-			// Ensure change is not negative
 			return change > 0 ? change : 0;
 		},
 
@@ -434,6 +518,39 @@ export default {
 		// Display formatted difference payment
 		diff_payment_display() {
 			return this.formatCurrency(this.diff_payment, this.displayCurrency);
+		},
+		// Display formatted tax total for summary
+		paymentTaxTotal() {
+			if (!this.invoice_doc) {
+				return 0;
+			}
+			let taxTotal = this.invoice_doc.total_taxes_and_charges || 0;
+			if (
+				this.pos_profile?.posa_allow_multi_currency &&
+				this.invoice_doc.currency !== this.pos_profile.currency
+			) {
+				taxTotal = taxTotal / (this.invoice_doc.conversion_rate || 1);
+			}
+			return this.flt(taxTotal, this.currency_precision);
+		},
+		paymentTaxDisplay() {
+			return this.formatCurrency(this.paymentTaxTotal, this.displayCurrency);
+		},
+		paymentDiscountTotal() {
+			if (!this.invoice_doc) {
+				return 0;
+			}
+			let discount = parseFloat(formatUtils.fromArabicNumerals(String(this.invoice_doc.discount_amount || 0)));
+			if (Number.isNaN(discount)) {
+				discount = 0;
+			}
+			if (this.invoice_doc.is_return) {
+				discount = Math.abs(discount);
+			}
+			return this.flt(discount, this.currency_precision);
+		},
+		paymentDiscountDisplay() {
+			return this.formatCurrency(this.paymentDiscountTotal, this.displayCurrency);
 		},
 		// Calculate available loyalty points amount in selected currency
 		available_points_amount() {
@@ -511,6 +628,12 @@ export default {
 		showOrderDetails() {
 			return this.invoice_doc && this.invoiceType === "Order";
 		},
+		showSalesPersonField() {
+			return this.showOrderDetails || this.is_credit_sale;
+		},
+		showDeliveryDateField() {
+			return this.showOrderDetails || this.is_credit_sale;
+		},
 		showCreditDueDateField() {
 			if (!this.invoice_doc) {
 				return false;
@@ -521,7 +644,10 @@ export default {
 			return this.showOrderDetails && this.invoice_doc && !!this.invoice_doc.customer;
 		},
 		showAdditionalDetailsSection() {
-			return !!this.invoice_doc;
+			if (!this.invoice_doc) {
+				return false;
+			}
+			return this.showOrderDetails || this.is_credit_sale || this.showShippingAddressField || this.showCreditDueDateField;
 		},
 		showCreditSaleToggle() {
 			return this.invoiceType === "Invoice" && this.invoice_doc && !this.invoice_doc.is_return;
@@ -533,7 +659,7 @@ export default {
 			if (!this.invoice_doc) {
 				return false;
 			}
-			const total = this.invoice_doc.rounded_total || this.invoice_doc.grand_total || 0;
+			const total = this.invoiceTotal;
 			return this.showPaymentMethodsSection && Math.abs(total) > 0;
 		},
 	},
@@ -621,9 +747,10 @@ export default {
 				});
 			} else {
 				// If credit sale is disabled, set cash payment to invoice total
+				const total = this.invoiceTotal;
 				this.invoice_doc.payments.forEach((payment) => {
 					if (payment.mode_of_payment.toLowerCase() === "cash") {
-						payment.amount = this.invoice_doc.rounded_total || this.invoice_doc.grand_total;
+						payment.amount = total;
 					}
 				});
 			}
@@ -647,6 +774,185 @@ export default {
 		},
 	},
 	methods: {
+		openNumericKeypad({
+			initialValue = 0,
+			title = frappe._("Enter Amount"),
+			helperText = "",
+			allowDecimal = true,
+			allowNegative = false,
+			decimalPlaces = this.currency_precision,
+			onConfirm = null,
+		}) {
+			this.numericKeypad.title = title;
+			this.numericKeypad.helperText = helperText;
+			this.numericKeypad.allowDecimal = allowDecimal;
+			this.numericKeypad.allowNegative = allowNegative;
+			this.numericKeypad.decimalPlaces = decimalPlaces ?? this.currency_precision;
+			this.numericKeypad.apply = typeof onConfirm === "function" ? onConfirm : null;
+			const preparedValue = this.prepareKeypadValue(initialValue, this.numericKeypad.decimalPlaces);
+			this.numericKeypad.value = preparedValue;
+			this.numericKeypad.visible = true;
+		},
+		closeNumericKeypad() {
+			this.numericKeypad.visible = false;
+			this.numericKeypad.apply = null;
+		},
+		handleNumericKeypadConfirm(rawValue) {
+			const precision = this.numericKeypad.decimalPlaces ?? this.currency_precision;
+			const numericValue = this.parseKeypadNumber(rawValue, precision);
+			if (typeof this.numericKeypad.apply === "function") {
+				this.numericKeypad.apply(numericValue);
+			}
+			this.closeNumericKeypad();
+		},
+		prepareKeypadValue(value, precision = this.currency_precision) {
+			const parsed = this.parseKeypadNumber(value, precision);
+			const factor = Number.isInteger(precision) ? precision : this.currency_precision;
+			const normalized = factor > 0 ? Number(parsed.toFixed(factor)) : parsed;
+			return String(normalized).replace(/^-0$/, "0");
+		},
+		parseKeypadNumber(value, precision = this.currency_precision) {
+			const parsed = parseFloat(formatUtils.fromArabicNumerals(String(value || 0)));
+			if (Number.isNaN(parsed)) {
+				return 0;
+			}
+			return this.flt(parsed, precision);
+		},
+		openPaymentAmountKeypad(payment) {
+			if (!payment) {
+				return;
+			}
+			this.set_rest_amount(payment);
+			const isReturn = this.invoice_doc?.is_return || this.invoiceType === "Return";
+			const initialValue = Math.abs(parseFloat(payment.amount || 0)) || 0;
+			const helperText = isReturn
+				? frappe._("Return payments are stored as negative amounts automatically.")
+				: "";
+			this.openNumericKeypad({
+				initialValue,
+				title: frappe._("Payment Amount"),
+				helperText,
+				allowDecimal: true,
+				allowNegative: isReturn,
+				onConfirm: (value) => {
+					let resolved = value;
+					if (isReturn) {
+						resolved = -Math.abs(resolved);
+					}
+					payment.amount = resolved;
+					if (payment.base_amount !== undefined) {
+						payment.base_amount = resolved;
+					}
+					this.normalizePaymentAmount(payment);
+				},
+			});
+		},
+		handlePaymentAmountFocus(payment) {
+			this.set_rest_amount(payment);
+			if (this.prefersTouchKeypad) {
+				this.openPaymentAmountKeypad(payment);
+			}
+		},
+		openPaidChangeKeypad() {
+			this.openNumericKeypad({
+				initialValue: Math.abs(this.paid_change || 0),
+				title: frappe._("Paid Change"),
+				helperText: "",
+				onConfirm: (value) => {
+					this.paid_change = value;
+					this.onPaidChangeBlur();
+				},
+			});
+		},
+		openLoyaltyKeypad() {
+			this.openNumericKeypad({
+				initialValue: this.loyalty_amount || 0,
+				title: frappe._("Redeem Loyalty Amount"),
+				helperText: frappe._("Available: {0}", [this.formatCurrency(this.available_points_amount || 0)]),
+				onConfirm: (value) => {
+					this.loyalty_amount = value;
+				},
+			});
+		},
+		openCustomerCreditKeypad(credit) {
+			if (!credit) {
+				return;
+			}
+			this.openNumericKeypad({
+				initialValue: credit.credit_to_redeem || 0,
+				title: frappe._("Redeem Customer Credit"),
+				helperText: frappe._("Available: {0}", [this.formatCurrency(credit.total_credit || 0)]),
+				onConfirm: (value) => {
+					credit.credit_to_redeem = value;
+					this.normalizeCustomerCredit(credit);
+				},
+			});
+		},
+		handleInvoiceTotalsUpdate(updatedDoc) {
+			if (!updatedDoc) {
+				return;
+			}
+			if (!this.invoice_doc) {
+				this.invoice_doc = updatedDoc;
+				return;
+			}
+			const fieldsToSync = [
+				"rounded_total",
+				"grand_total",
+				"total",
+				"net_total",
+				"total_taxes_and_charges",
+				"base_total",
+				"base_grand_total",
+				"base_total_taxes_and_charges",
+				"discount_amount",
+				"currency",
+				"conversion_rate",
+				"outstanding_amount",
+				"due_date",
+				"in_words",
+			];
+			fieldsToSync.forEach((field) => {
+				if (Object.prototype.hasOwnProperty.call(updatedDoc, field)) {
+					this.$set(this.invoice_doc, field, updatedDoc[field]);
+				}
+			});
+			if (Object.prototype.hasOwnProperty.call(updatedDoc, "taxes")) {
+				this.$set(this.invoice_doc, "taxes", Array.isArray(updatedDoc.taxes) ? [...updatedDoc.taxes] : updatedDoc.taxes);
+			}
+			if (Object.prototype.hasOwnProperty.call(updatedDoc, "rounded_total_export")) {
+				this.$set(this.invoice_doc, "rounded_total_export", updatedDoc.rounded_total_export);
+			}
+			this.$forceUpdate();
+		},
+		resolveInvoiceTotal(doc) {
+			if (!doc) {
+				return 0;
+			}
+			const parseAmount = (value) => {
+				const parsed = parseFloat(formatUtils.fromArabicNumerals(String(value ?? 0)));
+				return Number.isNaN(parsed) ? 0 : parsed;
+			};
+			const multiCurrency = Boolean(
+				this.pos_profile?.posa_allow_multi_currency &&
+				doc.currency &&
+				this.pos_profile?.currency &&
+				doc.currency !== this.pos_profile.currency,
+			);
+			if (multiCurrency) {
+				return parseAmount(doc.grand_total);
+			}
+			if (!this.isRoundedTotalDisabled && doc.rounded_total != null) {
+				return parseAmount(doc.rounded_total);
+			}
+			if (doc.grand_total != null) {
+				return parseAmount(doc.grand_total);
+			}
+			if (doc.rounded_total != null) {
+				return parseAmount(doc.rounded_total);
+			}
+			return 0;
+		},
 		// Go back to invoice view and reset customer readonly
 		back_to_invoice() {
 			this.showModal = false;
@@ -661,15 +967,29 @@ export default {
 			if (data === "true") {
 				this.showModal = true;
 				this.$nextTick(() => {
+					const containerRef = this.$refs.paymentContainer;
+					const containerEl = containerRef && containerRef.$el ? containerRef.$el : containerRef;
+					if (containerEl) {
+						if (typeof containerEl.scrollTo === "function") {
+							containerEl.scrollTo({ top: 0, behavior: "auto" });
+						} else if (Object.prototype.hasOwnProperty.call(containerEl, "scrollTop")) {
+							containerEl.scrollTop = 0;
+						}
+					}
 					setTimeout(() => {
 						const btn = this.$refs.submitButton;
 						const el = btn && btn.$el ? btn.$el : btn;
+						if (el && typeof el.focus === "function") {
+							try {
+								el.focus({ preventScroll: true });
+							} catch (err) {
+								el.focus();
+							}
+						}
 						if (el) {
-							el.scrollIntoView({ behavior: "smooth", block: "center" });
-							el.focus();
 							this.highlightSubmit = true;
 						}
-					}, 100);
+					}, 120);
 				});
 			} else {
 				this.showModal = false;
@@ -722,6 +1042,9 @@ export default {
 		},
 		onPaidChangeFocus() {
 			this.is_user_editing_paid_change = true;
+			if (this.prefersTouchKeypad) {
+				this.openPaidChangeKeypad();
+			}
 		},
 		onPaidChangeBlur() {
 			const raw = formatUtils.fromArabicNumerals
@@ -792,7 +1115,7 @@ export default {
 			if (!hasPaymentSet) {
 				const default_payment = this.invoice_doc.payments.find((payment) => payment.default === 1);
 				if (default_payment) {
-					const amount = this.invoice_doc.rounded_total || this.invoice_doc.grand_total;
+					const amount = this.resolveInvoiceTotal(this.invoice_doc);
 					default_payment.amount = -Math.abs(amount);
 					if (default_payment.base_amount !== undefined) {
 						default_payment.base_amount = -Math.abs(amount);
@@ -815,12 +1138,13 @@ export default {
 			if (this.invoice_doc.is_return) {
 				this.ensureReturnPaymentsAreNegative();
 			}
+			const invoiceTotal = this.invoiceTotal;
 			// Validate total payments only if not credit sale and invoice total is not zero
 			if (
 				!this.is_credit_sale &&
 				!this.invoice_doc.is_return &&
 				this.total_payments <= 0 &&
-				(this.invoice_doc.rounded_total || this.invoice_doc.grand_total) > 0
+				invoiceTotal > 0
 			) {
 				this.eventBus.emit("show_message", {
 					title: `Please enter payment amount`,
@@ -842,8 +1166,8 @@ export default {
 				if (has_cash_payment && cash_amount > 0) {
 					if (
 						!this.pos_profile.posa_allow_partial_payment &&
-						cash_amount < (this.invoice_doc.rounded_total || this.invoice_doc.grand_total) &&
-						(this.invoice_doc.rounded_total || this.invoice_doc.grand_total) > 0
+						cash_amount < invoiceTotal &&
+						invoiceTotal > 0
 					) {
 						this.eventBus.emit("show_message", {
 							title: `Cash payment cannot be less than invoice total when partial payment is not allowed`,
@@ -858,8 +1182,8 @@ export default {
 			if (
 				!this.is_credit_sale &&
 				!this.pos_profile.posa_allow_partial_payment &&
-				this.total_payments < (this.invoice_doc.rounded_total || this.invoice_doc.grand_total) &&
-				(this.invoice_doc.rounded_total || this.invoice_doc.grand_total) > 0
+				this.total_payments < invoiceTotal &&
+				invoiceTotal > 0
 			) {
 				this.eventBus.emit("show_message", {
 					title: `The amount paid is not complete`,
@@ -918,8 +1242,7 @@ export default {
 			}
 			if (
 				!this.invoice_doc.is_return &&
-				this.redeemed_customer_credit >
-				(this.invoice_doc.rounded_total || this.invoice_doc.grand_total)
+				this.redeemed_customer_credit > invoiceTotal
 			) {
 				this.eventBus.emit("show_message", {
 					title: `Cannot redeem customer credit more than invoice total`,
@@ -1110,8 +1433,8 @@ export default {
 			if (!this.invoice_doc || !Array.isArray(this.invoice_doc.payments) || !payment) {
 				return;
 			}
-			const isReturn = this.invoice_doc.is_return || this.invoiceType === "Return";
-			const totalAmount = this.flt(this.invoice_doc.rounded_total || this.invoice_doc.grand_total || 0, this.currency_precision);
+		const isReturn = this.invoice_doc.is_return || this.invoiceType === "Return";
+		const totalAmount = this.invoiceTotal;
 			if (!totalAmount) {
 				return;
 			}
@@ -1131,7 +1454,7 @@ export default {
 				return;
 			}
 
-			const amount = isReturn ? -Math.abs(totalAmount) : totalAmount;
+		const amount = isReturn ? -Math.abs(totalAmount) : totalAmount;
 			targetPayment.amount = amount;
 			if (targetPayment.base_amount !== undefined) {
 				targetPayment.base_amount = isReturn ? -Math.abs(amount) : amount;
@@ -1254,7 +1577,7 @@ export default {
 					.then((r) => {
 						const data = r.message;
 						if (data.length) {
-							const amount = this.invoice_doc.rounded_total || this.invoice_doc.grand_total;
+							const amount = this.invoiceTotal;
 							let remainAmount = amount;
 							data.forEach((row) => {
 								if (remainAmount > 0) {
@@ -1476,7 +1799,7 @@ export default {
 		set_mpesa_payment(payment) {
 			this.pos_profile.use_customer_credit = true;
 			this.redeem_customer_credit = true;
-			const invoiceAmount = this.invoice_doc.rounded_total || this.invoice_doc.grand_total;
+		const invoiceAmount = this.invoiceTotal;
 			let amount =
 				payment.unallocated_amount > invoiceAmount ? invoiceAmount : payment.unallocated_amount;
 			amount = amount > 0 ? amount : 0;
@@ -1603,7 +1926,7 @@ export default {
 		},
 		// Get change amount for display
 		get_change_amount() {
-			return Math.max(0, this.total_payments - this.invoice_doc.grand_total);
+			return Math.max(0, this.total_payments - this.invoiceTotal);
 		},
 		// Sync any invoices stored offline and show pending/synced counts
 		async syncPendingInvoices() {
@@ -1648,6 +1971,14 @@ export default {
 	},
 	// Lifecycle hook: mounted
 	mounted() {
+		if (typeof window !== "undefined") {
+			try {
+				const coarseMatch = window.matchMedia?.("(pointer: coarse)")?.matches;
+				this.prefersTouchKeypad = Boolean(coarseMatch || "ontouchstart" in window);
+			} catch (err) {
+				this.prefersTouchKeypad = false;
+			}
+		}
 		this.$nextTick(() => {
 			// Listen to various event bus events for POS actions
 			this.eventBus.on("send_invoice_doc_payment", (invoice_doc) => {
@@ -1664,21 +1995,19 @@ export default {
 						payment.base_amount = 0;
 					});
 					// Set default payment to negative amount for returns
-					if (default_payment) {
-						const amount = invoice_doc.rounded_total || invoice_doc.grand_total;
-						default_payment.amount = -Math.abs(amount);
-						if (default_payment.base_amount !== undefined) {
-							default_payment.base_amount = -Math.abs(amount);
-						}
-					}
-				} else if (default_payment) {
-					// For regular invoices, set positive amount
-					default_payment.amount = this.flt(
-						invoice_doc.rounded_total || invoice_doc.grand_total,
-						this.currency_precision,
-					);
-					this.is_credit_return = false;
-				}
+		if (default_payment) {
+			const amount = this.resolveInvoiceTotal(invoice_doc);
+			default_payment.amount = -Math.abs(amount);
+			if (default_payment.base_amount !== undefined) {
+				default_payment.base_amount = -Math.abs(amount);
+			}
+		}
+		} else if (default_payment) {
+			// For regular invoices, set positive amount
+			const total = this.resolveInvoiceTotal(invoice_doc);
+			default_payment.amount = this.flt(total, this.currency_precision);
+			this.is_credit_return = false;
+		}
 				this.loyalty_amount = 0;
 				this.redeemed_customer_credit = 0;
 				// Only get addresses if customer exists
@@ -1732,6 +2061,7 @@ export default {
 			this.eventBus.on("set_mpesa_payment", (data) => {
 				this.set_mpesa_payment(data);
 			});
+			this.eventBus.on("refresh_invoice_totals", this.handleInvoiceTotalsUpdate);
 			// Clear any stored invoice when parent emits clear_invoice
 			this.eventBus.on("clear_invoice", () => {
 				this.invoice_doc = "";
@@ -1757,6 +2087,7 @@ export default {
 		this.eventBus.off("network-online", this.syncPendingInvoices);
 		this.eventBus.off("server-online", this.syncPendingInvoices);
 		this.eventBus.off("show_payment", this.handleShowPayment);
+		this.eventBus.off("refresh_invoice_totals", this.handleInvoiceTotalsUpdate);
 	},
 	// Lifecycle hook: unmounted
 	unmounted() {
@@ -1800,8 +2131,7 @@ export default {
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
-	padding: 0 8px 14px;
-	padding-bottom: 140px;
+	padding: 12px 8px 140px;
 }
 
 .payment-layout {
@@ -1811,7 +2141,7 @@ export default {
 }
 
 .payment-section {
-	background-color: var(--surface-secondary, rgba(255, 255, 255, 0.85));
+	background-color: rgb(var(--v-theme-surface));
 	border: 1px solid rgba(var(--v-theme-outline), 0.12);
 	border-radius: 16px;
 	padding: 14px 16px;
@@ -1847,9 +2177,7 @@ export default {
 }
 
 .payment-section--summary {
-	position: sticky;
-	top: 8px;
-	z-index: 3;
+	border-color: rgba(var(--v-theme-outline), 0.2) !important;
 }
 
 .payment-method-list {
@@ -1976,15 +2304,29 @@ export default {
 .payments-actions {
 	position: sticky;
 	bottom: 0;
-	background: rgb(var(--v-theme-surface));
-	padding: 16px 16px 20px;
-	box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
-	border-radius: 16px 16px 0 0;
-	border-top: 1px solid rgba(var(--v-theme-outline), 0.12);
+	background: rgb(var(--v-theme-surface)) !important;
+	padding: 20px 24px;
+	box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
+	border-radius: 24px 24px 0 0;
+	border: 1px solid rgba(var(--v-theme-outline), 0.16);
+	z-index: 5;
 }
 
-.payments-actions :deep(.v-row) {
-	row-gap: 12px;
+.payments-actions-row {
+	row-gap: 14px;
+	column-gap: 16px;
+}
+
+.payments-actions-row>.v-col {
+	display: flex;
+}
+
+.payments-actions-btn {
+	width: 100%;
+	height: 100%;
+	border-radius: 18px !important;
+	font-size: 1.05rem !important;
+	font-weight: 600 !important;
 }
 
 .read-only-field :deep(.v-field) {
@@ -2047,7 +2389,7 @@ export default {
 	}
 
 	.payments-body {
-		padding: 0 4px 20px;
+		padding: 12px 4px 120px;
 		gap: 20px;
 	}
 
@@ -2067,6 +2409,15 @@ export default {
 	.payment-toggle-row {
 		gap: 12px;
 	}
+
+	.payments-actions {
+		padding: 16px 18px;
+		border-radius: 20px 20px 0 0;
+	}
+
+	.payments-actions-btn {
+		font-size: 1rem !important;
+	}
 }
 
 /* Remove readonly styling */
@@ -2079,7 +2430,7 @@ export default {
 }
 
 .cards {
-	background-color: var(--surface-secondary) !important;
+	background-color: rgb(var(--v-theme-surface)) !important;
 }
 
 .submit-btn {
@@ -2111,5 +2462,13 @@ export default {
 .submit-highlight {
 	box-shadow: 0 0 0 4px rgb(var(--v-theme-primary));
 	transition: box-shadow 0.3s ease-in-out;
+}
+
+.icon-close-btn {
+	background-color: rgba(var(--v-theme-primary), 0.12) !important;
+	color: rgb(var(--v-theme-primary)) !important;
+	border-radius: 14px !important;
+	width: 44px !important;
+	height: 44px !important;
 }
 </style>

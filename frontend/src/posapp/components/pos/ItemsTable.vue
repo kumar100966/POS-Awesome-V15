@@ -30,19 +30,29 @@
 			<template v-slot:item.qty="{ item }">
 				<div class="pos-table__qty-counter" :class="{ 'rtl-layout': isRTL }" :title="`RTL: ${isRTL}`">
 					<div class="pos-table__qty-btn-wrapper" @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop>
-						<v-btn :disabled="!!item.posa_is_replace" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--minus" @click.stop="handleMinusClick(item)">
-							<v-icon size="small">mdi-minus</v-icon>
+						<v-btn :disabled="!!item.posa_is_replace" size="large" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--minus touch-action-btn--icon" @click.stop="handleMinusClick(item)">
+							<v-icon size="default">mdi-minus</v-icon>
 						</v-btn>
 					</div>
-					<div class="pos-table__qty-display amount-value number-field-rtl" :class="{
-						'negative-number': isNegative(item.qty),
-						'large-number': memoizedQtyLength(item.qty) > 6,
-					}" :data-length="memoizedQtyLength(item.qty)" :title="formatFloat(item.qty, 0)">
-						{{ formatFloat(item.qty, 0) }}
-					</div>
+				<div class="pos-table__qty-display amount-value number-field-rtl" :class="{
+					'negative-number': isNegative(item.qty),
+					'large-number': memoizedQtyLength(item.qty) > 6,
+				}" :data-length="memoizedQtyLength(item.qty)" :title="formatFloat(item.qty, 0)">
+					<span class="qty-display-text">{{ formatFloat(item.qty, 0) }}</span>
+					<v-btn
+						variant="text"
+						class="touch-keypad-btn qty-keypad-btn"
+						size="large"
+						icon
+						:disabled="!!item.posa_is_replace"
+						@click.stop="openQtyKeypad(item)"
+					>
+						<v-icon size="28">mdi-dialpad</v-icon>
+					</v-btn>
+				</div>
 					<div class="pos-table__qty-btn-wrapper" @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop @click.stop.prevent="handleIncrement(item)">
-						<v-btn :disabled="isIncrementDisabled(item)" size="small" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--plus" @click.stop.prevent="handleIncrement(item)">
-							<v-icon size="small">mdi-plus</v-icon>
+						<v-btn :disabled="isIncrementDisabled(item)" size="large" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--plus touch-action-btn--icon" @click.stop.prevent="handleIncrement(item)">
+							<v-icon size="default">mdi-plus</v-icon>
 						</v-btn>
 					</div>
 				</div>
@@ -97,17 +107,17 @@
 			</template>
 
 			<!-- Offer toggle button column -->
-			<template v-slot:item.posa_is_offer="{ item }">
-				<v-btn size="x-small" color="primary" variant="tonal" class="ma-0 pa-0" @click.stop="toggleOffer(item)">
-					{{ item.posa_offer_applied ? __("Remove Offer") : __("Apply Offer") }}
-				</v-btn>
-			</template>
-			<!-- Actions column -->
-			<template v-slot:item.actions="{ item }">
-				<v-btn :disabled="!!item.posa_is_replace" size="small" variant="flat" class="pos-table__delete-btn" @click.stop="removeItem(item)">
-					<v-icon size="small">mdi-delete-outline</v-icon>
-				</v-btn>
-			</template>
+				<template v-slot:item.posa_is_offer="{ item }">
+					<v-btn size="large" color="primary" variant="tonal" class="ma-0 pa-0 touch-action-btn" @click.stop="toggleOffer(item)">
+						{{ item.posa_offer_applied ? __("Remove Offer") : __("Apply Offer") }}
+					</v-btn>
+				</template>
+				<!-- Actions column -->
+				<template v-slot:item.actions="{ item }">
+					<v-btn :disabled="!!item.posa_is_replace" size="large" variant="flat" class="pos-table__delete-btn touch-action-btn--icon" @click.stop="removeItem(item)">
+						<v-icon size="default">mdi-delete-outline</v-icon>
+					</v-btn>
+				</template>
 
 			<!-- Expanded row handled via dialog -->
 			<template v-slot:expanded-row>
@@ -152,7 +162,26 @@
 									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Item Code')" class="pos-themed-input" hide-details v-model="detailItem.item_code" disabled prepend-inner-icon="mdi-barcode"></v-text-field>
 								</div>
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('QTY')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.qty, 0)" @change="handleQtyChange(detailItem, $event)" :rules="[isNumber]" :disabled="!!detailItem.posa_is_replace" prepend-inner-icon="mdi-numeric"></v-text-field>
+									<v-text-field
+										density="compact"
+										variant="outlined"
+										color="primary"
+										:label="frappe._('QTY')"
+										class="pos-themed-input"
+										hide-details
+										:model-value="formatFloat(detailItem.qty, 0)"
+										@change="handleQtyChange(detailItem, $event)"
+										@focus="handleDetailQtyFocus(detailItem)"
+										:rules="[isNumber]"
+										:disabled="!!detailItem.posa_is_replace"
+										prepend-inner-icon="mdi-numeric"
+									>
+										<template #append-inner>
+											<v-btn icon size="large" class="touch-keypad-btn" :disabled="!!detailItem.posa_is_replace" @click.stop="openDetailQtyKeypad(detailItem)">
+												<v-icon size="28">mdi-dialpad</v-icon>
+											</v-btn>
+										</template>
+									</v-text-field>
 									<div v-if="detailItem.max_qty !== undefined" class="text-caption mt-1">
 										{{ __('In stock: {0}', [formatFloat(detailItem.max_qty, 0)]) }}
 									</div>
@@ -170,27 +199,127 @@
 							</div>
 							<div class="form-row">
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" id="dialog-rate" :label="frappe._('Rate')" class="pos-themed-input" hide-details :model-value="formatCurrency(detailItem.rate)" @change="[setFormatedCurrency(detailItem, 'rate', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]" :disabled="!pos_profile.posa_allow_user_to_edit_rate || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied" prepend-inner-icon="mdi-currency-usd"></v-text-field>
+									<v-text-field
+										density="compact"
+										variant="outlined"
+										color="primary"
+										id="dialog-rate"
+										:label="frappe._('Rate')"
+										class="pos-themed-input"
+										hide-details
+										:model-value="formatCurrency(detailItem.rate)"
+										@change="[setFormatedCurrency(detailItem, 'rate', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]"
+										@focus="handleDetailRateFocus(detailItem)"
+										:disabled="!pos_profile.posa_allow_user_to_edit_rate || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
+										prepend-inner-icon="mdi-currency-usd"
+									>
+										<template #append-inner>
+											<v-btn
+												icon
+												size="large"
+												class="touch-keypad-btn"
+												:disabled="!pos_profile.posa_allow_user_to_edit_rate || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
+												@click.stop="openDetailRateKeypad(detailItem)"
+											>
+												<v-icon size="28">mdi-dialpad</v-icon>
+											</v-btn>
+										</template>
+									</v-text-field>
 								</div>
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" id="dialog-discount-perc" :label="frappe._('Discount %')" class="pos-themed-input" hide-details :model-value="formatFloat(detailItem.discount_percentage || 0)" @change="[setFormatedCurrency(detailItem, 'discount_percentage', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]" :disabled="!pos_profile.posa_allow_user_to_edit_item_discount || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied" prepend-inner-icon="mdi-percent"></v-text-field>
+									<v-text-field
+										density="compact"
+										variant="outlined"
+										color="primary"
+										id="dialog-discount-perc"
+										:label="frappe._('Discount %')"
+										class="pos-themed-input"
+										hide-details
+										:model-value="formatFloat(detailItem.discount_percentage || 0)"
+										@change="[setFormatedCurrency(detailItem, 'discount_percentage', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]"
+										@focus="handleDetailDiscountPercentFocus(detailItem)"
+										:disabled="!pos_profile.posa_allow_user_to_edit_item_discount || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
+										prepend-inner-icon="mdi-percent"
+									>
+										<template #append-inner>
+											<v-btn
+												icon
+												size="large"
+												class="touch-keypad-btn"
+												:disabled="!pos_profile.posa_allow_user_to_edit_item_discount || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
+												@click.stop="openDetailDiscountPercentKeypad(detailItem)"
+											>
+												<v-icon size="28">mdi-dialpad</v-icon>
+											</v-btn>
+										</template>
+									</v-text-field>
 								</div>
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" id="dialog-discount-amount" :label="frappe._('Discount Amount')" class="pos-themed-input" hide-details :model-value="formatCurrency(detailItem.discount_amount || 0)" @change="[setFormatedCurrency(detailItem, 'discount_amount', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]" :disabled="!pos_profile.posa_allow_user_to_edit_item_discount || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied" prepend-inner-icon="mdi-tag-minus"></v-text-field>
+									<v-text-field
+										density="compact"
+										variant="outlined"
+										color="primary"
+										id="dialog-discount-amount"
+										:label="frappe._('Discount Amount')"
+										class="pos-themed-input"
+										hide-details
+										:model-value="formatCurrency(detailItem.discount_amount || 0)"
+										@change="[setFormatedCurrency(detailItem, 'discount_amount', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]"
+										@focus="handleDetailDiscountAmountFocus(detailItem)"
+										:disabled="!pos_profile.posa_allow_user_to_edit_item_discount || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
+										prepend-inner-icon="mdi-tag-minus"
+									>
+										<template #append-inner>
+											<v-btn
+												icon
+												size="large"
+												class="touch-keypad-btn"
+												:disabled="!pos_profile.posa_allow_user_to_edit_item_discount || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
+												@click.stop="openDetailDiscountAmountKeypad(detailItem)"
+											>
+												<v-icon size="28">mdi-dialpad</v-icon>
+											</v-btn>
+										</template>
+									</v-text-field>
 								</div>
 							</div>
 							<div class="form-row">
 								<div class="form-field">
-									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Price List Rate')" class="pos-themed-input" hide-details :model-value="formatCurrency(detailItem.price_list_rate ?? 0)" :disabled="!pos_profile.posa_allow_price_list_rate_change" prepend-inner-icon="mdi-format-list-numbered" :prefix="currencySymbol(pos_profile.currency)" @change="changePriceListRate(detailItem)"></v-text-field>
+									<v-text-field
+										density="compact"
+										variant="outlined"
+										color="primary"
+										:label="frappe._('Price List Rate')"
+										class="pos-themed-input"
+										hide-details
+										:model-value="formatCurrency(detailItem.price_list_rate ?? 0)"
+										:disabled="!pos_profile.posa_allow_price_list_rate_change"
+										prepend-inner-icon="mdi-format-list-numbered"
+										:prefix="currencySymbol(pos_profile.currency)"
+										@change="changePriceListRate(detailItem)"
+										@focus="handleDetailPriceListRateFocus(detailItem)"
+									>
+										<template #append-inner>
+											<v-btn
+												icon
+												size="large"
+												class="touch-keypad-btn"
+												:disabled="!pos_profile.posa_allow_price_list_rate_change"
+												@click.stop="openDetailPriceListRateKeypad(detailItem)"
+											>
+												<v-icon size="28">mdi-dialpad</v-icon>
+											</v-btn>
+										</template>
+									</v-text-field>
 								</div>
 								<div class="form-field">
 									<v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Total Amount')" class="pos-themed-input" hide-details :model-value="formatCurrency(detailItem.qty * detailItem.rate)" disabled prepend-inner-icon="mdi-calculator"></v-text-field>
 								</div>
-								<div class="form-field" v-if="pos_profile.posa_allow_price_list_rate_change">
-									<v-btn size="small" color="primary" variant="outlined" class="change-price-btn" @click.stop="changePriceListRate(detailItem)">
-										<v-icon size="small" class="mr-1">mdi-pencil</v-icon>
-										{{ __('Change Price') }}
-									</v-btn>
+					<div class="form-field" v-if="pos_profile.posa_allow_price_list_rate_change">
+						<v-btn size="large" color="primary" variant="outlined" class="change-price-btn touch-action-btn" @click.stop="changePriceListRate(detailItem)">
+							<v-icon size="small" class="mr-1">mdi-pencil</v-icon>
+							{{ __('Change Price') }}
+						</v-btn>
 								</div>
 							</div>
 						</div>
@@ -300,15 +429,33 @@
 				</v-card-actions>
 			</v-card>
 		</v-dialog>
+		<NumericKeypad
+			:visible="numericKeypad.visible"
+			:model-value="numericKeypad.value"
+			:title="numericKeypad.title"
+			:helper-text="numericKeypad.helperText"
+			:allow-decimal="numericKeypad.allowDecimal"
+			:allow-negative="numericKeypad.allowNegative"
+			:decimal-places="numericKeypad.decimalPlaces"
+			@update:modelValue="(val) => (numericKeypad.value = val)"
+			@update:visible="(val) => (numericKeypad.visible = val)"
+			@confirm="handleNumericKeypadConfirm"
+			@cancel="closeNumericKeypad"
+		/>
 	</div>
 </template>
 
 <script>
 /* global process */
 import _ from "lodash";
+import { formatUtils } from "../../format";
+import NumericKeypad from "./NumericKeypad.vue";
 import placeholderImage from "./placeholder-image.png";
 export default {
 	name: "ItemsTable",
+	components: {
+		NumericKeypad,
+	},
 	props: {
 		headers: Array,
 		items: Array,
@@ -360,6 +507,17 @@ export default {
 			columnVisibility: new Map(),
 			// Performance optimization caches
 			qtyLengthCache: new Map(),
+			prefersTouchKeypad: false,
+			numericKeypad: {
+				visible: false,
+				value: "0",
+				title: "",
+				helperText: "",
+				allowDecimal: true,
+				allowNegative: false,
+				decimalPlaces: 2,
+				apply: null,
+			},
 		};
 	},
 	computed: {
@@ -827,23 +985,204 @@ export default {
 			}
 		},
 
-		onDropFromSelector(event) {
-			event.preventDefault();
+	onDropFromSelector(event) {
+		event.preventDefault();
 
-			try {
-				const dragData = JSON.parse(event.dataTransfer.getData("application/json"));
+		try {
+			const dragData = JSON.parse(event.dataTransfer.getData("application/json"));
 
-				if (dragData.type === "item-from-selector") {
-					this.addItemDebounced(dragData.item);
-					this.$emit("item-dropped", false);
-				}
-			} catch (error) {
-				console.error("Error parsing drag data:", error);
+			if (dragData.type === "item-from-selector") {
+				this.addItemDebounced(dragData.item);
+				this.$emit("item-dropped", false);
 			}
-		},
-		addItem(newItem) {
-			// Find a matching item (by item_code, uom, and rate)
-			const match = this.items.find(
+		} catch (error) {
+			console.error("Error parsing drag data:", error);
+		}
+	},
+	openNumericKeypad({
+		initialValue = 0,
+		title = __("Enter Value"),
+		helperText = "",
+		allowDecimal = true,
+		allowNegative = false,
+		decimalPlaces = null,
+		onConfirm = null,
+	}) {
+		const defaultPrecision = Number(this.pos_profile?.currency_precision ?? 2);
+		const precision = Number.isFinite(Number(decimalPlaces))
+			? Number(decimalPlaces)
+			: defaultPrecision;
+		this.numericKeypad.title = title;
+		this.numericKeypad.helperText = helperText;
+		this.numericKeypad.allowDecimal = allowDecimal;
+		this.numericKeypad.allowNegative = allowNegative;
+		this.numericKeypad.decimalPlaces = precision;
+		this.numericKeypad.apply = typeof onConfirm === "function" ? onConfirm : null;
+		this.numericKeypad.value = this.prepareKeypadValue(initialValue, precision);
+		this.numericKeypad.visible = true;
+	},
+	closeNumericKeypad() {
+		this.numericKeypad.visible = false;
+		this.numericKeypad.apply = null;
+	},
+	handleNumericKeypadConfirm(rawValue) {
+		const precision = this.numericKeypad.decimalPlaces ?? Number(this.pos_profile?.currency_precision ?? 2);
+		const numericValue = this.parseKeypadNumber(rawValue, precision);
+		if (typeof this.numericKeypad.apply === "function") {
+			this.numericKeypad.apply(numericValue);
+		}
+		this.closeNumericKeypad();
+	},
+	prepareKeypadValue(value, precision = 2) {
+		const numeric = this.parseKeypadNumber(value, precision);
+		const fixed = precision > 0 ? Number(numeric.toFixed(precision)) : numeric;
+		return String(fixed).replace(/^-0$/, "0");
+	},
+	parseKeypadNumber(value, precision = 2) {
+		const parsed = parseFloat(formatUtils.fromArabicNumerals(String(value ?? 0)));
+		if (Number.isNaN(parsed)) {
+			return 0;
+		}
+		const factor = Math.pow(10, precision);
+		return Math.round(parsed * factor) / factor;
+	},
+	openQtyKeypad(item) {
+		if (!item) {
+			return;
+		}
+		this.openNumericKeypad({
+			initialValue: Math.abs(item.qty || 0),
+			title: __("Set Quantity"),
+			helperText: this.isReturnInvoice
+				? __("Negative quantities are applied automatically for returns.")
+				: "",
+			allowDecimal: true,
+			allowNegative: this.isReturnInvoice,
+			onConfirm: (value) => {
+				if (!this.isReturnInvoice && value <= 0) {
+					this.removeItem(item);
+					return;
+				}
+				const resolved = this.isReturnInvoice ? -Math.abs(value) : value;
+				this.setFormatedQty(item, "qty", null, false, resolved);
+				this.$forceUpdate();
+			},
+		});
+	},
+	openDetailQtyKeypad(item) {
+		if (!item) {
+			return;
+		}
+		this.openNumericKeypad({
+			initialValue: Math.abs(item.qty || 0),
+			title: __("Set Quantity"),
+			helperText: this.isReturnInvoice
+				? __("Negative quantities are applied automatically for returns.")
+				: "",
+			allowDecimal: true,
+			allowNegative: this.isReturnInvoice,
+			onConfirm: (value) => {
+				if (!this.isReturnInvoice && value <= 0) {
+					this.removeItem(item);
+					return;
+				}
+				const resolved = this.isReturnInvoice ? -Math.abs(value) : value;
+				this.setFormatedQty(item, "qty", null, false, resolved);
+				this.$forceUpdate();
+			},
+		});
+	},
+	openDetailRateKeypad(item) {
+		if (!item) {
+			return;
+		}
+		this.openNumericKeypad({
+			initialValue: item.rate || 0,
+			title: __("Set Rate"),
+			allowDecimal: true,
+			onConfirm: (value) => {
+				this.setFormatedCurrency(item, "rate", null, false, value);
+				const fakeEvent = { target: { value } };
+				this.calcPrices(item, value, fakeEvent);
+				this.$forceUpdate();
+			},
+		});
+	},
+	openDetailDiscountPercentKeypad(item) {
+		if (!item) {
+			return;
+		}
+		this.openNumericKeypad({
+			initialValue: item.discount_percentage || 0,
+			title: __("Set Discount %"),
+			allowDecimal: true,
+			onConfirm: (value) => {
+				this.setFormatedCurrency(item, "discount_percentage", null, false, value);
+				const fakeEvent = { target: { value } };
+				this.calcPrices(item, value, fakeEvent);
+				this.$forceUpdate();
+			},
+		});
+	},
+	openDetailDiscountAmountKeypad(item) {
+		if (!item) {
+			return;
+		}
+		this.openNumericKeypad({
+			initialValue: item.discount_amount || 0,
+			title: __("Set Discount Amount"),
+			allowDecimal: true,
+			onConfirm: (value) => {
+				this.setFormatedCurrency(item, "discount_amount", null, false, value);
+				const fakeEvent = { target: { value } };
+				this.calcPrices(item, value, fakeEvent);
+				this.$forceUpdate();
+			},
+		});
+	},
+	openDetailPriceListRateKeypad(item) {
+		if (!item) {
+			return;
+		}
+		this.openNumericKeypad({
+			initialValue: item.price_list_rate || 0,
+			title: __("Set Price List Rate"),
+			allowDecimal: true,
+			onConfirm: (value) => {
+				this.setFormatedCurrency(item, "price_list_rate", null, false, value);
+				this.changePriceListRate(item);
+				this.$forceUpdate();
+			},
+		});
+	},
+	handleDetailQtyFocus(item) {
+		if (this.prefersTouchKeypad) {
+			this.openDetailQtyKeypad(item);
+		}
+	},
+	handleDetailRateFocus(item) {
+		if (this.prefersTouchKeypad) {
+			this.openDetailRateKeypad(item);
+		}
+	},
+	handleDetailDiscountPercentFocus(item) {
+		if (this.prefersTouchKeypad) {
+			this.openDetailDiscountPercentKeypad(item);
+		}
+	},
+	handleDetailDiscountAmountFocus(item) {
+		if (this.prefersTouchKeypad) {
+			this.openDetailDiscountAmountKeypad(item);
+		}
+	},
+	handleDetailPriceListRateFocus(item) {
+		if (this.prefersTouchKeypad) {
+			this.openDetailPriceListRateKeypad(item);
+		}
+	},
+	addItem(newItem) {
+		// Find a matching item (by item_code, uom, and rate)
+		const match = this.items.find(
 				(item) =>
 					item.item_code === newItem.item_code &&
 					item.uom === newItem.uom &&
@@ -943,6 +1282,14 @@ export default {
 	},
 
 	mounted() {
+		if (typeof window !== "undefined") {
+			try {
+				const coarse = window.matchMedia?.("(pointer: coarse)")?.matches;
+				this.prefersTouchKeypad = Boolean(coarse || "ontouchstart" in window);
+			} catch (err) {
+				this.prefersTouchKeypad = false;
+			}
+		}
 		this.setupResizeObserver();
 
 		// Performance optimization: defer non-critical initialization
@@ -972,6 +1319,7 @@ export default {
 		if (this.qtyLengthCache) {
 			this.qtyLengthCache.clear();
 		}
+		this.closeNumericKeypad();
 	},
 };
 </script>
@@ -1040,6 +1388,32 @@ export default {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+.touch-action-btn {
+	min-height: 52px !important;
+	padding: 12px 18px !important;
+	font-size: 1rem !important;
+	border-radius: 14px !important;
+}
+
+.touch-action-btn :deep(.v-btn__content) {
+	font-size: inherit !important;
+	letter-spacing: 0.3px;
+}
+
+.touch-action-btn--icon {
+	min-width: 52px !important;
+	min-height: 52px !important;
+	border-radius: 18px !important;
+}
+
+.touch-action-btn--icon :deep(.v-icon) {
+	font-size: 1.4rem !important;
+}
+
+.pos-table__qty-counter {
+	gap: 10px;
 }
 
 .pos-table :deep(.v-data-table__tbody > tr) {
@@ -2725,6 +3099,17 @@ body[dir="rtl"] .amount-value.right-aligned {
 	background: transparent !important;
 }
 
+.pos-table :deep(th[data-column-key="data-table-expand"]),
+.pos-table :deep(td[data-column-key="data-table-expand"]) {
+	display: none !important;
+	width: 0 !important;
+	padding: 0 !important;
+}
+
+.pos-table :deep(.v-data-table__expand-icon) {
+	display: none !important;
+}
+
 .pos-table :deep(th[data-column-key="discount_value"]),
 .pos-table :deep(td[data-column-key="discount_value"]),
 .pos-table :deep(th[data-column-key="discount_amount"]),
@@ -2992,16 +3377,17 @@ body[dir="rtl"] .number-field-rtl {
 	unicode-bidi: embed !important;
 }
 
+
 .pos-table__qty-display {
 	/* Dynamic width based on content with proper constraints */
-	min-width: 50px;
-	max-width: 100px;
+	min-width: 70px;
+	max-width: 140px;
 	width: auto;
 	flex: 1 1 auto;
 	text-align: center;
-	font-weight: 600;
-	padding: 6px 4px;
-	border-radius: 6px;
+	font-weight: 700;
+	padding: 8px 6px;
+	border-radius: 10px;
 	background: var(--pos-primary-container);
 	border: 1px solid var(--pos-primary-variant);
 	font-family:
@@ -3013,13 +3399,14 @@ body[dir="rtl"] .number-field-rtl {
 		"lnum" 1,
 		"kern" 1;
 	color: var(--pos-primary);
-	font-size: 0.8rem;
+	font-size: 1rem;
 	transition: all 0.2s ease;
 	box-shadow: 0 1px 3px var(--pos-shadow-light);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	height: 32px;
+	gap: 8px;
+	height: 40px;
 	/* Handle overflow gracefully */
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -3029,12 +3416,35 @@ body[dir="rtl"] .number-field-rtl {
 	word-spacing: -0.1em;
 }
 
+.qty-display-text {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.touch-keypad-btn {
+	min-width: 44px !important;
+	height: 44px !important;
+	border-radius: 12px !important;
+}
+
+.touch-keypad-btn :deep(.v-icon) {
+	font-size: 28px !important;
+}
+
+.qty-keypad-btn {
+	background-color: rgba(var(--v-theme-primary), 0.08) !important;
+	color: rgb(var(--v-theme-primary)) !important;
+}
+
 /* Special handling for very large numbers */
 .pos-table__qty-display.large-number {
-	min-width: 70px;
-	max-width: 120px;
-	font-size: 0.75rem;
-	padding: 6px 3px;
+	min-width: 100px;
+	max-width: 180px;
+	font-size: 0.95rem;
+	padding: 8px 4px;
 	letter-spacing: -0.04em;
 }
 
@@ -3047,8 +3457,8 @@ body[dir="rtl"] .number-field-rtl {
 
 /* Dynamic container expansion for larger numbers */
 .pos-table__qty-counter:has(.large-number) {
-	min-width: 150px;
-	max-width: 200px;
+	min-width: 180px;
+	max-width: 240px;
 }
 
 /* Responsive text sizing based on number length */

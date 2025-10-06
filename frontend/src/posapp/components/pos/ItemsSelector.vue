@@ -1,7 +1,14 @@
 <template>
 	<v-dialog v-model="showModal" max-width="90vw" max-height="90vh" scrollable :fullscreen="$vuetify.display.mobile" attach="body">
 		<template v-slot:activator="{ props }">
-			<v-btn v-bind="props" color="primary" density="comfortable" prepend-icon="mdi-shopping" variant="elevated" class="select-items-trigger-btn">
+			<v-btn
+				v-bind="props"
+				color="primary"
+				size="large"
+				prepend-icon="mdi-shopping"
+				variant="elevated"
+				class="select-items-trigger-btn touch-action-btn"
+			>
 				{{ __("Select Items") }}
 			</v-btn>
 		</template>
@@ -71,13 +78,13 @@
 										</v-col>
 										<v-col cols="12" class="dynamic-margin-xs">
 											<div class="settings-container">
-												<v-btn density="compact" variant="text" color="primary" prepend-icon="mdi-cog-outline" @click="toggleItemSettings" class="settings-btn">
-													{{ __("Settings") }}
-												</v-btn>
-												<v-spacer></v-spacer>
-												<v-btn density="compact" variant="text" color="primary" prepend-icon="mdi-refresh" @click="forceReloadItems" class="settings-btn">
-													{{ __("Reload Items") }}
-												</v-btn>
+										<v-btn size="large" variant="text" color="primary" prepend-icon="mdi-cog-outline" @click="toggleItemSettings" class="settings-btn touch-action-btn">
+											{{ __("Settings") }}
+										</v-btn>
+										<v-spacer></v-spacer>
+										<v-btn size="large" variant="text" color="primary" prepend-icon="mdi-refresh" @click="forceReloadItems" class="settings-btn touch-action-btn">
+											{{ __("Reload Items") }}
+										</v-btn>
 
 									<v-dialog v-model="show_item_settings" max-width="400px" @keydown.esc.stop.prevent="cancelItemSettings" attach="body">
 													<v-card>
@@ -251,18 +258,18 @@
 											<v-text-field density="compact" variant="solo" color="primary" :label="frappe._('Price List')" hide-details :model-value="active_price_list" readonly></v-text-field>
 										</v-col>
 										<v-col cols="3" class="dynamic-margin-xs">
-											<v-btn-toggle v-model="items_view" color="primary" group density="compact" rounded>
-												<v-btn size="small" value="list">{{ __("List") }}</v-btn>
-												<v-btn size="small" value="card">{{ __("Card") }}</v-btn>
+											<v-btn-toggle v-model="items_view" color="primary" group density="comfortable" rounded class="items-view-toggle">
+												<v-btn class="touch-toggle-btn" size="large" value="list">{{ __("List") }}</v-btn>
+												<v-btn class="touch-toggle-btn" size="large" value="card">{{ __("Card") }}</v-btn>
 											</v-btn-toggle>
 										</v-col>
 										<v-col cols="5" class="dynamic-margin-xs">
-											<v-btn size="small" block color="warning" variant="text" @click="show_offers" class="action-btn-consistent">
+											<v-btn size="large" block color="warning" variant="text" @click="show_offers" class="action-btn-consistent touch-action-btn">
 												{{ offersCount }} {{ __("Offers") }}
 											</v-btn>
 										</v-col>
 										<v-col cols="4" class="dynamic-margin-xs">
-											<v-btn size="small" block color="primary" variant="text" @click="show_coupons" class="action-btn-consistent">{{ couponsCount }} {{ __("Coupons") }}</v-btn>
+											<v-btn size="large" block color="primary" variant="text" @click="show_coupons" class="action-btn-consistent touch-action-btn">{{ couponsCount }} {{ __("Coupons") }}</v-btn>
 										</v-col>
 									</v-row>
 								</v-card>
@@ -361,6 +368,7 @@ export default {
 		itemDetailsRetryCount: 0,
 		itemDetailsRetryTimeout: null,
 		items_loaded: false,
+		items_view_initialized: false,
 		selected_currency: "",
 		exchange_rate: 1,
 		prePopulateInProgress: false,
@@ -611,6 +619,24 @@ export default {
 	},
 
 	methods: {
+		shouldUseCardView(profile) {
+			const value = profile?.posa_default_card_view;
+			if (typeof value === "string") {
+				const normalized = value.trim().toLowerCase();
+				return ["1", "true", "yes", "on"].includes(normalized);
+			}
+			return Boolean(value);
+		},
+		applyDefaultItemsView(force = false) {
+			if (!this.pos_profile) {
+				return;
+			}
+			if (!force && this.items_view_initialized) {
+				return;
+			}
+			this.items_view = this.shouldUseCardView(this.pos_profile) ? "card" : "list";
+			this.items_view_initialized = true;
+		},
 		// Utility helpers
 		getItemUomQuantities(item) {
 			if (!item) {
@@ -3105,6 +3131,7 @@ export default {
 				// Load initial items if we have a profile
 				if (this.pos_profile && this.pos_profile.name) {
 					console.log("Loading items with POS Profile:", this.pos_profile.name);
+					this.applyDefaultItemsView();
 					this.get_items_groups();
 					await this.initializeItems();
 				} else {
@@ -3121,7 +3148,7 @@ export default {
 			this.stock_settings = data.stock_settings || {};
 			this.get_items_groups();
 			await this.initializeItems();
-			this.items_view = this.pos_profile.posa_default_card_view ? "card" : "list";
+			this.applyDefaultItemsView(true);
 		});
 		this.eventBus.on("update_cur_items_details", () => {
 			this.update_cur_items_details();
@@ -3379,12 +3406,31 @@ export default {
 </script>
 
 <style scoped>
+.touch-action-btn {
+	min-height: 56px;
+	padding: 12px 20px;
+	font-size: 1rem;
+}
+
 .select-items-trigger-btn {
 	margin: 0;
 	white-space: nowrap;
+	min-height: 60px;
+}
+
+.settings-btn {
+	min-width: 150px;
+	justify-content: center;
+}
+
+.items-view-toggle {
+	width: 100%;
+}
+
+.items-view-toggle .touch-toggle-btn {
 	min-height: 52px;
-	padding-top: 12px;
-	padding-bottom: 12px;
+	font-size: 1rem;
+	flex: 1;
 }
 
 /* Modal-specific styles */
@@ -4051,9 +4097,10 @@ export default {
 	padding: var(--dynamic-sm) !important;
 }
 
+
 .action-btn-consistent {
 	margin-top: var(--dynamic-xs) !important;
-	padding: var(--dynamic-xs) var(--dynamic-sm) !important;
+	padding: 12px 18px !important;
 	transition: var(--transition-normal) !important;
 }
 
@@ -4078,6 +4125,12 @@ export default {
 }
 
 @media (max-width: 768px) {
+	.touch-action-btn {
+		min-height: 50px;
+		padding: 10px 16px;
+		font-size: 0.95rem;
+	}
+
 	.dynamic-padding {
 		/* Reduce spacing uniformly on smaller screens */
 		padding: var(--dynamic-xs);
