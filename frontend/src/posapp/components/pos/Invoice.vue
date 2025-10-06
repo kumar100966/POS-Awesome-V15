@@ -71,7 +71,21 @@
 					<div class="items-table-wrapper">
 						<!-- Column selector button moved outside the table -->
 						<div class="column-selector-container">
-							<v-text-field v-model="itemSearch" density="compact" variant="solo" color="primary" class="item-search-field pos-themed-input" :label="__('Search items or barcode')" prepend-inner-icon="mdi-magnify" hide-details clearable autocomplete="off"></v-text-field>
+							<v-text-field
+								ref="itemSearchInput"
+								v-model="itemSearch"
+								density="compact"
+								variant="solo"
+								color="primary"
+								class="item-search-field pos-themed-input"
+								:label="__('Search items or barcode')"
+								prepend-inner-icon="mdi-magnify"
+								hide-details
+								clearable
+								autocomplete="off"
+								@keydown.enter.prevent="handleItemSearchSubmit"
+								@keydown.numpad-enter.prevent="handleItemSearchSubmit"
+							></v-text-field>
 							<div class="column-selector-actions">
 								<ItemsSelector />
 								<v-btn density="compact" variant="text" color="primary" prepend-icon="mdi-cog-outline" @click="toggleColumnSelection" class="column-selector-btn">
@@ -279,6 +293,142 @@ export default {
 		...shortcutMethods,
 		...offerMethods,
 		...invoiceItemMethods,
+		normalizeSearchValue(value) {
+			return String(value ?? "")
+				.trim()
+				.replace(/\s+/g, "")
+				.toLowerCase();
+		},
+		getItemSearchTokens(item) {
+			if (!item) {
+				return [];
+			}
+			const tokens = new Set();
+			const pushToken = (val) => {
+				if (val === undefined || val === null) return;
+				const normalized = this.normalizeSearchValue(val);
+				if (normalized) {
+					tokens.add(normalized);
+				}
+			};
+
+			pushToken(item.item_code);
+			pushToken(item.item_name);
+			pushToken(item.barcode);
+			pushToken(item.plu);
+			pushToken(item.sku);
+
+			if (Array.isArray(item.item_barcode)) {
+				item.item_barcode.forEach((entry) => {
+					if (typeof entry === "string") {
+						pushToken(entry);
+					} else if (entry && typeof entry === "object") {
+						pushToken(entry.barcode);
+					}
+				});
+			}
+
+			if (Array.isArray(item.barcodes)) {
+				item.barcodes.forEach(pushToken);
+			}
+
+			if (Array.isArray(item.alternative_barcodes)) {
+				item.alternative_barcodes.forEach(pushToken);
+			}
+
+			return Array.from(tokens);
+		},
+		findInvoiceItemByQuery(query) {
+			if (!query) {
+				return null;
+			}
+			const normalized = this.normalizeSearchValue(query);
+			if (!normalized) {
+				return null;
+			}
+			return this.items.find((item) => this.getItemSearchTokens(item).includes(normalized)) || null;
+		},
+		findCatalogItemByQuery(query) {
+			if (!query || !Array.isArray(this.allItems) || !this.allItems.length) {
+				return null;
+			}
+			const normalized = this.normalizeSearchValue(query);
+			if (!normalized) {
+				return null;
+			}
+			return (
+				this.allItems.find((item) => this.getItemSearchTokens(item).includes(normalized)) || null
+			);
+		},
+		focusItemSearch(selectContents = false) {
+			this.$nextTick(() => {
+				const field = this.$refs.itemSearchInput;
+				if (field && typeof field.focus === "function") {
+					field.focus();
+				}
+				const inputEl = field?.$el?.querySelector?.("input");
+				if (selectContents && inputEl) {
+					inputEl.select();
+				}
+			});
+		},
+		handleFocusItemSearchEvent() {
+			this.focusItemSearch(true);
+		},
+		async handleItemSearchSubmit(event) {
+			const rawValue =
+				typeof event?.target?.value === "string" ? event.target.value : this.itemSearch;
+			const trimmed = rawValue != null ? rawValue.trim() : "";
+
+			if (!trimmed) {
+				this.itemSearch = "";
+				this.focusItemSearch(true);
+				return;
+			}
+
+			const invoiceMatch = this.findInvoiceItemByQuery(trimmed);
+			if (invoiceMatch) {
+				this.itemSearch = trimmed;
+				this.focusItemSearch(true);
+				return;
+			}
+
+			const catalogMatch = this.findCatalogItemByQuery(trimmed);
+			if (!catalogMatch) {
+				this.eventBus.emit("show_message", {
+					title: __(`No matching item found for "{0}"`, [trimmed]),
+					color: "error",
+				});
+				this.itemSearch = "";
+				this.focusItemSearch(true);
+				return;
+			}
+
+			const payload = JSON.parse(JSON.stringify(catalogMatch));
+			if (!payload.qty) {
+				payload.qty = 1;
+			}
+			if (!payload.uom && payload.stock_uom) {
+				payload.uom = payload.stock_uom;
+			}
+
+			try {
+				await this.add_item(payload);
+				this.eventBus.emit("show_message", {
+					title: __(`Item {0} added to invoice`, [payload.item_name || payload.item_code || trimmed]),
+					color: "success",
+				});
+			} catch (error) {
+				console.error("Failed to add item from quick search", error);
+				this.eventBus.emit("show_message", {
+					title: __("Unable to add item from quick search"),
+					color: "error",
+				});
+			}
+
+			this.itemSearch = "";
+			this.focusItemSearch(true);
+		},
 		initializeItemsHeaders() {
 			// Define all available columns
 			this.available_columns = [
@@ -1134,6 +1284,7 @@ export default {
 			this.clear_invoice();
 			this.eventBus.emit("focus_item_search");
 		});
+		this.eventBus.on("focus_item_search", this.handleFocusItemSearchEvent);
 		this.eventBus.on("load_invoice", (data) => {
 			this.load_invoice(data);
 		});
@@ -1222,6 +1373,7 @@ export default {
 		this.eventBus.off("clear_invoice");
 		// Cleanup reset_posting_date listener
 		this.eventBus.off("reset_posting_date");
+		this.eventBus.off("focus_item_search", this.handleFocusItemSearchEvent);
 	},
 	// Register global keyboard shortcuts when component is created
 	created() {

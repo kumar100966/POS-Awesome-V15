@@ -139,7 +139,16 @@
 				<v-divider></v-divider>
 				<v-card-text class="py-6">
 					<div class="detail-overview" v-if="detailItem">
-						<v-img :src="detailItem.image || placeholderImage" class="detail-image" aspect-ratio="1" cover :alt="detailItem.item_name || detailItem.item_code">
+						<v-img
+							:src="detailItem.image || placeholderImage"
+							class="detail-image"
+							aspect-ratio="1"
+							cover
+							:alt="detailItem.item_name || detailItem.item_code"
+							:class="{ 'clickable-image': !!detailItem.image }"
+							:role="detailItem?.image ? 'button' : undefined"
+							@click.stop="openImagePreview(detailItem.image, detailItem.item_name || detailItem.item_code)"
+						>
 							<template v-slot:placeholder>
 								<div class="detail-image-placeholder">
 									<v-icon size="40" color="grey-lighten-2">mdi-image</v-icon>
@@ -415,7 +424,21 @@
 					<v-btn variant="text" @click="closeDetailDialog">{{ __('Close') }}</v-btn>
 				</v-card-actions>
 			</v-card>
-		</v-dialog>
+	</v-dialog>
+	<v-dialog v-model="imagePreview.visible" max-width="700" class="image-preview-dialog" attach="body">
+		<v-card v-if="imagePreview.src">
+			<v-card-title class="d-flex align-center">
+				<span>{{ imagePreview.title || __('Image Preview') }}</span>
+				<v-spacer></v-spacer>
+				<v-btn icon="mdi-open-in-new" variant="text" class="mr-1" @click="openPreviewInNewTab" :title="__('Open in new tab')"></v-btn>
+				<v-btn icon="mdi-close" variant="text" @click="closeImagePreview"></v-btn>
+			</v-card-title>
+			<v-divider></v-divider>
+			<v-card-text class="pa-0">
+				<v-img :src="imagePreview.src" :alt="imagePreview.alt || imagePreview.title" class="image-preview-img" cover></v-img>
+			</v-card-text>
+		</v-card>
+	</v-dialog>
 
 	<v-dialog v-model="editNameDialog" max-width="400" attach="body">
 			<v-card>
@@ -519,6 +542,12 @@ export default {
 				allowNegative: false,
 				decimalPlaces: 2,
 				apply: null,
+			},
+			imagePreview: {
+				visible: false,
+				src: "",
+				title: "",
+				alt: "",
 			},
 		};
 	},
@@ -708,6 +737,15 @@ export default {
 		detailDialog(val) {
 			if (!val) {
 				this.detailItem = null;
+			}
+		},
+		"imagePreview.visible"(visible) {
+			if (!visible && this.imagePreview.src) {
+				this.$nextTick(() => {
+					this.imagePreview.src = "";
+					this.imagePreview.title = "";
+					this.imagePreview.alt = "";
+				});
 			}
 		},
 	},
@@ -1076,6 +1114,29 @@ export default {
 			return;
 		}
 		this.openQtyKeypad(item);
+	},
+	openImagePreview(src, title = "") {
+		if (!src) {
+			return;
+		}
+		this.imagePreview.src = src;
+		this.imagePreview.title = title || __("Image Preview");
+		this.imagePreview.alt = title || __("Product image");
+		this.imagePreview.visible = true;
+	},
+	closeImagePreview() {
+		this.imagePreview.visible = false;
+	},
+	openPreviewInNewTab() {
+		if (!this.imagePreview.src) {
+			return;
+		}
+		if (typeof window !== "undefined") {
+			const popup = window.open(this.imagePreview.src, "_blank", "noopener");
+			if (popup) {
+				popup.opener = null;
+			}
+		}
 	},
 	openDetailQtyKeypad(item) {
 		if (!item) {
@@ -1449,6 +1510,19 @@ export default {
 
 .dialog-close-btn :deep(.v-icon) {
 	font-size: 1.1rem !important;
+}
+
+.clickable-image {
+	cursor: zoom-in;
+	transition: transform 0.2s ease;
+}
+
+.clickable-image:hover {
+	transform: scale(1.02);
+}
+
+.image-preview-img {
+	max-height: 70vh;
 }
 
 .pos-table__qty-counter {

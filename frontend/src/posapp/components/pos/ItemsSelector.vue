@@ -126,8 +126,15 @@
 											</div>
 											<div v-else class="items-card-grid" ref="itemsContainer" @scroll.passive="onCardScroll" :class="{ 'item-container': isOverflowing }">
 												<div v-for="item in filtered_items" :key="item.item_code" class="card-item-card" @click="select_item($event, item)" :draggable="true" @dragstart="onDragStart($event, item)" @dragend="onDragEnd">
-													<div class="card-item-image-container">
-														<v-img :src="item.image || placeholderImage" class="card-item-image" aspect-ratio="1" :alt="item.item_name">
+												<div class="card-item-image-container">
+													<v-img
+														:src="item.image || placeholderImage"
+														class="card-item-image"
+														aspect-ratio="1"
+														:alt="item.item_name"
+														:class="{ 'clickable-image': !!item.image }"
+														@click.stop="openImagePreview(item.image, item.item_name, item.item_name)"
+													>
 															<template v-slot:placeholder>
 																<div class="image-placeholder">
 																	<v-icon size="40" color="grey-lighten-2">mdi-image</v-icon>
@@ -283,6 +290,20 @@
 			</v-card-text>
 		</v-card>
 	</v-dialog>
+	<v-dialog v-model="imagePreview.visible" max-width="700" class="item-image-preview-dialog" attach="body">
+		<v-card v-if="imagePreview.src">
+			<v-card-title class="d-flex align-center">
+				<span>{{ imagePreview.title || __('Image Preview') }}</span>
+				<v-spacer></v-spacer>
+				<v-btn icon="mdi-open-in-new" variant="text" class="mr-1" :title="__('Open in new tab')" @click="openPreviewInNewTab"></v-btn>
+				<v-btn icon="mdi-close" variant="text" @click="closeImagePreview"></v-btn>
+			</v-card-title>
+			<v-divider></v-divider>
+			<v-card-text class="pa-0">
+				<v-img :src="imagePreview.src" :alt="imagePreview.alt || imagePreview.title" class="image-preview-img" cover></v-img>
+			</v-card-text>
+		</v-card>
+	</v-dialog>
 </template>
 
 <script type="module">
@@ -422,9 +443,24 @@ export default {
 		pendingScanCode: "",
 		awaitingScanResult: false,
 		unwatchScanError: null,
+		imagePreview: {
+			visible: false,
+			src: "",
+			title: "",
+			alt: "",
+		},
 	}),
 
 	watch: {
+		"imagePreview.visible"(visible) {
+			if (!visible && this.imagePreview.src) {
+				this.$nextTick(() => {
+					this.imagePreview.src = "";
+					this.imagePreview.title = "";
+					this.imagePreview.alt = "";
+				});
+			}
+		},
 		customer: _.debounce(function () {
 			if (this.pos_profile.posa_force_reload_items) {
 				if (this.pos_profile.posa_smart_reload_mode) {
@@ -636,6 +672,34 @@ export default {
 			}
 			this.items_view = this.shouldUseCardView(this.pos_profile) ? "card" : "list";
 			this.items_view_initialized = true;
+		},
+		openImagePreview(src, title = "", alt = "") {
+			if (!src) {
+				return;
+			}
+			this.imagePreview.src = src;
+			this.imagePreview.title = title || __("Image Preview");
+			this.imagePreview.alt = alt || title || __("Product image");
+			this.imagePreview.visible = true;
+		},
+		closeImagePreview() {
+			this.imagePreview.visible = false;
+			this.$nextTick(() => {
+				this.imagePreview.src = "";
+				this.imagePreview.title = "";
+				this.imagePreview.alt = "";
+			});
+		},
+		openPreviewInNewTab() {
+			if (!this.imagePreview.src) {
+				return;
+			}
+			if (typeof window !== "undefined") {
+				const popup = window.open(this.imagePreview.src, "_blank", "noopener");
+				if (popup) {
+					popup.opener = null;
+				}
+			}
 		},
 		// Utility helpers
 		getItemUomQuantities(item) {
@@ -3410,6 +3474,19 @@ export default {
 	min-height: 56px;
 	padding: 12px 20px;
 	font-size: 1rem;
+}
+
+.card-item-image.clickable-image {
+	cursor: zoom-in;
+	transition: transform 0.2s ease;
+}
+
+.card-item-image.clickable-image:hover {
+	transform: scale(1.02);
+}
+
+.item-image-preview-dialog .image-preview-img {
+	max-height: 70vh;
 }
 
 .selector-close-btn {
