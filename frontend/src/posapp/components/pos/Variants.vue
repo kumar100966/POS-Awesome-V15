@@ -330,7 +330,18 @@ export default {
 		async add_item(item) {
 			console.log("add_item called", item.item_code);
 			await this.fetchVariantRate(item);
-			const payload = { ...item, code: item.item_code };
+			if (!item.uom && item.stock_uom) {
+				item.uom = item.stock_uom;
+			}
+			const payload = {
+				...item,
+				code: item.item_code,
+				item_uoms: Array.isArray(item.item_uoms)
+					? item.item_uoms.map((uom) => ({ ...uom }))
+					: item.stock_uom
+						? [{ uom: item.stock_uom, conversion_factor: 1 }]
+						: [],
+			};
 			console.log("emitting add_item", {
 				code: payload.code,
 				rate: payload.rate,

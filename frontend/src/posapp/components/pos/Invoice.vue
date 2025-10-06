@@ -411,6 +411,15 @@ export default {
 			if (!payload.uom && payload.stock_uom) {
 				payload.uom = payload.stock_uom;
 			}
+			if (!Array.isArray(payload.item_uoms) || !payload.item_uoms.length) {
+				if (Array.isArray(catalogMatch.item_uoms) && catalogMatch.item_uoms.length) {
+					payload.item_uoms = catalogMatch.item_uoms.map((uom) => ({ ...uom }));
+				} else if (payload.stock_uom) {
+					payload.item_uoms = [{ uom: payload.stock_uom, conversion_factor: 1 }];
+				} else {
+					payload.item_uoms = [];
+				}
+			}
 
 			try {
 				await this.add_item(payload);

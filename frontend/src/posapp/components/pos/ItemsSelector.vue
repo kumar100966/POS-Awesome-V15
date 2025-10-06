@@ -443,6 +443,7 @@ export default {
 		pendingScanCode: "",
 		awaitingScanResult: false,
 		unwatchScanError: null,
+		lastStockRefresh: 0,
 		imagePreview: {
 			visible: false,
 			src: "",
@@ -452,6 +453,11 @@ export default {
 	}),
 
 	watch: {
+		showModal(value) {
+			if (value) {
+				this.refreshItemsStockFromServer();
+			}
+		},
 		"imagePreview.visible"(visible) {
 			if (!visible && this.imagePreview.src) {
 				this.$nextTick(() => {
@@ -700,6 +706,101 @@ export default {
 					popup.opener = null;
 				}
 			}
+		},
+		async updateAvailabilityForCodes(codes = []) {
+			if (!Array.isArray(codes) || !codes.length) {
+				return false;
+			}
+
+			if (!this.pos_profile || !this.pos_profile.warehouse || isOffline()) {
+				return false;
+			}
+
+			const warehouse = this.pos_profile.warehouse;
+			const uniqueCodes = Array.from(new Set(codes.filter(Boolean)));
+			if (!uniqueCodes.length) {
+				return false;
+			}
+			this.lastStockRefresh = Date.now();
+
+			const chunkSize = 50;
+			let didUpdate = false;
+			for (let i = 0; i < uniqueCodes.length; i += chunkSize) {
+				const chunk = uniqueCodes.slice(i, i + chunkSize);
+				try {
+					const response = await frappe.call({
+						method: "posawesome.posawesome.api.items.get_available_qty",
+						args: {
+							items: JSON.stringify(
+								chunk.map((item_code) => ({
+									item_code,
+									warehouse,
+								})),
+							),
+						},
+					});
+					const rows = Array.isArray(response?.message) ? response.message : [];
+					if (!rows.length) {
+						continue;
+					}
+					const qtyMap = new Map();
+					rows.forEach((row) => {
+						if (row?.item_code) {
+							const qty = Number(row.available_qty ?? 0);
+							qtyMap.set(row.item_code, qty);
+						}
+					});
+					if (!qtyMap.size) {
+						continue;
+					}
+					this.items.forEach((item) => {
+						if (qtyMap.has(item.item_code)) {
+							const qty = qtyMap.get(item.item_code);
+							if (item.actual_qty !== qty || item.available_qty !== qty) {
+								item.actual_qty = qty;
+								item.available_qty = qty;
+								didUpdate = true;
+							}
+						}
+					});
+				} catch (error) {
+					console.error("Failed to refresh availability for items", error);
+				}
+			}
+
+			if (didUpdate) {
+				if (this.searchCache) {
+					this.searchCache.clear();
+				}
+				this.eventBus.emit("set_all_items", this.items);
+				this.$nextTick(() => {
+					this.checkItemContainerOverflow();
+					this.$forceUpdate();
+				});
+			}
+
+			return didUpdate;
+		},
+		async handleRefreshItemsStock(soldItems = []) {
+			if (!Array.isArray(soldItems) || !soldItems.length) {
+				return;
+			}
+			const codes = soldItems
+				.map((item) => item?.item_code)
+				.filter(Boolean);
+			await this.updateAvailabilityForCodes(codes);
+		},
+		async refreshItemsStockFromServer() {
+			if (!this.items || !this.items.length || isOffline()) {
+				return;
+			}
+			const now = Date.now();
+			if (this.lastStockRefresh && now - this.lastStockRefresh < 5000) {
+				return;
+			}
+			this.lastStockRefresh = now;
+			const codes = this.items.map((item) => item?.item_code).filter(Boolean);
+			await this.updateAvailabilityForCodes(codes);
 		},
 		// Utility helpers
 		getItemUomQuantities(item) {
@@ -1815,7 +1916,17 @@ export default {
 					}
 					item.qty = qtyVal;
 				}
-				const payload = { ...item };
+				if (!item.uom && item.stock_uom) {
+					item.uom = item.stock_uom;
+				}
+				const payload = {
+					...item,
+					item_uoms: Array.isArray(item.item_uoms)
+						? item.item_uoms.map((uom) => ({ ...uom }))
+						: item.stock_uom
+							? [{ uom: item.stock_uom, conversion_factor: 1 }]
+							: [],
+				};
 				delete payload._barcode_qty;
 				this.eventBus.emit("add_item", payload);
 				this.qty = 1;
@@ -3231,6 +3342,7 @@ export default {
 		this.eventBus.on("update_customer", (data) => {
 			this.customer = data;
 		});
+		this.eventBus.on("refresh_items_stock", this.handleRefreshItemsStock);
 
 		this.eventBus.on("focus_item_search", () => {
 			this.focusItemSearch();
@@ -3257,9 +3369,7 @@ export default {
 
 		// Refresh item quantities when connection to server is restored
 		this.eventBus.on("server-online", async () => {
-			if (this.items && this.items.length > 0) {
-				await this.update_items_details(this.items);
-			}
+			await this.refreshItemsStockFromServer();
 		});
 
 		if (typeof Worker !== "undefined") {
@@ -3458,6 +3568,7 @@ export default {
 		this.eventBus.off("update_customer");
 		this.eventBus.off("force_reload_items");
 		this.eventBus.off("focus_item_search");
+		this.eventBus.off("refresh_items_stock");
 		document.removeEventListener("keydown", this.handleKeyboardShortcut);
 		document.removeEventListener("keydown", this.handleEscapeKey);
 		if (typeof this.unwatchScanError === "function") {

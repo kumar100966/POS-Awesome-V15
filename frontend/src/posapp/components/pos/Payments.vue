@@ -1419,6 +1419,12 @@ export default {
 					// Update local stock quantities immediately after successful
 					// invoice submission so item availability reflects changes
 					updateLocalStock(vm.invoice_doc.items || []);
+					const soldItems = (vm.invoice_doc.items || []).map((sold) => ({
+						item_code: sold.item_code,
+						warehouse: sold.warehouse || vm.pos_profile.warehouse,
+						batch_no: sold.batch_no || null,
+					}));
+					vm.eventBus.emit("refresh_items_stock", soldItems);
 					vm.addresses = [];
 					vm.eventBus.emit("clear_invoice");
 					vm.eventBus.emit("focus_item_search");
