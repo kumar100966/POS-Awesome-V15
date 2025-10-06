@@ -1,6 +1,6 @@
 <template>
 	<div ref="tableContainer" class="my-0 py-0 overflow-y-auto items-table-container responsive-table-container pos-themed-card" :style="containerStyles" :class="containerClasses" @dragover="onDragOverFromSelector($event)" @drop="onDropFromSelector($event)" @dragenter="onDragEnterFromSelector" @dragleave="onDragLeaveFromSelector">
-		<v-data-table :headers="responsiveHeaders" :items="items" :expanded="expanded" show-expand item-value="posa_row_id" class="pos-table elevation-2 pos-themed-card" :class="tableClasses" :items-per-page="itemsPerPage || -1" expand-on-click :density="tableDensity" hide-default-footer :single-expand="true" :header-props="dynamicHeaderProps" :no-data-text="__('No items in cart')" @update:expanded="handleExpandedUpdate" :search="itemSearch" :custom-filter="customItemFilter">
+		<v-data-table :headers="responsiveHeaders" :items="items" :expanded="expanded" item-value="posa_row_id" class="pos-table elevation-2 pos-themed-card" :class="tableClasses" :items-per-page="itemsPerPage || -1" expand-on-click :density="tableDensity" hide-default-footer :single-expand="true" :header-props="dynamicHeaderProps" :no-data-text="__('No items in cart')" @update:expanded="handleExpandedUpdate" :search="itemSearch" :custom-filter="customItemFilter">
 			<!-- UOM column -->
 			<template v-slot:item.uom="{ item }">
 				<div class="pos-table__uom-wrapper">
@@ -29,28 +29,30 @@
 			<!-- Quantity column -->
 			<template v-slot:item.qty="{ item }">
 				<div class="pos-table__qty-counter" :class="{ 'rtl-layout': isRTL }" :title="`RTL: ${isRTL}`">
-					<div class="pos-table__qty-btn-wrapper" @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop>
+					<div class="pos-table__qty-btn-wrapper minus-btn" @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop>
 						<v-btn :disabled="!!item.posa_is_replace" size="large" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--minus touch-action-btn--icon" @click.stop="handleMinusClick(item)">
 							<v-icon size="default">mdi-minus</v-icon>
 						</v-btn>
 					</div>
-				<div class="pos-table__qty-display amount-value number-field-rtl" :class="{
-					'negative-number': isNegative(item.qty),
-					'large-number': memoizedQtyLength(item.qty) > 6,
-				}" :data-length="memoizedQtyLength(item.qty)" :title="formatFloat(item.qty, 0)">
-					<span class="qty-display-text">{{ formatFloat(item.qty, 0) }}</span>
-					<v-btn
-						variant="text"
-						class="touch-keypad-btn qty-keypad-btn"
-						size="large"
-						icon
-						:disabled="!!item.posa_is_replace"
-						@click.stop="openQtyKeypad(item)"
+					<div
+						class="pos-table__qty-display amount-value number-field-rtl"
+						:class="{
+						'negative-number': isNegative(item.qty),
+						'large-number': memoizedQtyLength(item.qty) > 6,
+						'is-disabled': !!item.posa_is_replace,
+						}"
+						:data-length="memoizedQtyLength(item.qty)"
+						:title="formatFloat(item.qty, 0)"
+						role="button"
+						@click.stop="handleQtyDisplayActivate(item)"
+						@keydown.enter.prevent.stop="handleQtyDisplayActivate(item)"
+						@keydown.space.prevent.stop="handleQtyDisplayActivate(item)"
+						:tabindex="item.posa_is_replace ? -1 : 0"
+						:aria-disabled="!!item.posa_is_replace"
 					>
-						<v-icon size="28">mdi-dialpad</v-icon>
-					</v-btn>
-				</div>
-					<div class="pos-table__qty-btn-wrapper" @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop @click.stop.prevent="handleIncrement(item)">
+						<span class="qty-display-text">{{ formatFloat(item.qty, 0) }}</span>
+					</div>
+					<div class="pos-table__qty-btn-wrapper plus-btn" @mousedown.stop @mouseup.stop @touchstart.stop @touchend.stop @click.stop.prevent="handleIncrement(item)">
 						<v-btn :disabled="isIncrementDisabled(item)" size="large" variant="flat" class="pos-table__qty-btn pos-table__qty-btn--plus touch-action-btn--icon" @click.stop.prevent="handleIncrement(item)">
 							<v-icon size="default">mdi-plus</v-icon>
 						</v-btn>
@@ -132,7 +134,7 @@
 						<div class="text-caption text-medium-emphasis">{{ detailItem.item_code }}</div>
 					</div>
 					<v-spacer></v-spacer>
-					<v-btn icon="mdi-close" variant="text" @click="closeDetailDialog"></v-btn>
+					<v-btn icon="mdi-close" variant="tonal" color="primary" class="dialog-close-btn" @click="closeDetailDialog"></v-btn>
 				</v-card-title>
 				<v-divider></v-divider>
 				<v-card-text class="py-6">
@@ -208,7 +210,7 @@
 										class="pos-themed-input"
 										hide-details
 										:model-value="formatCurrency(detailItem.rate)"
-										@change="[setFormatedCurrency(detailItem, 'rate', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]"
+										@change="handlePricingChange(detailItem, 'rate', $event)"
 										@focus="handleDetailRateFocus(detailItem)"
 										:disabled="!pos_profile.posa_allow_user_to_edit_rate || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
 										prepend-inner-icon="mdi-currency-usd"
@@ -236,7 +238,7 @@
 										class="pos-themed-input"
 										hide-details
 										:model-value="formatFloat(detailItem.discount_percentage || 0)"
-										@change="[setFormatedCurrency(detailItem, 'discount_percentage', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]"
+										@change="handlePricingChange(detailItem, 'discount_percentage', $event)"
 										@focus="handleDetailDiscountPercentFocus(detailItem)"
 										:disabled="!pos_profile.posa_allow_user_to_edit_item_discount || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
 										prepend-inner-icon="mdi-percent"
@@ -264,7 +266,7 @@
 										class="pos-themed-input"
 										hide-details
 										:model-value="formatCurrency(detailItem.discount_amount || 0)"
-										@change="[setFormatedCurrency(detailItem, 'discount_amount', null, false, $event), calcPrices(detailItem, $event.target.value, $event)]"
+										@change="handlePricingChange(detailItem, 'discount_amount', $event)"
 										@focus="handleDetailDiscountAmountFocus(detailItem)"
 										:disabled="!pos_profile.posa_allow_user_to_edit_item_discount || !!detailItem.posa_is_replace || !!detailItem.posa_offer_applied"
 										prepend-inner-icon="mdi-tag-minus"
@@ -1069,6 +1071,12 @@ export default {
 			},
 		});
 	},
+	handleQtyDisplayActivate(item) {
+		if (!item || item.posa_is_replace) {
+			return;
+		}
+		this.openQtyKeypad(item);
+	},
 	openDetailQtyKeypad(item) {
 		if (!item) {
 			return;
@@ -1092,6 +1100,34 @@ export default {
 			},
 		});
 	},
+	applyItemPricing(item, field, payload) {
+		if (!item || !field) {
+			return;
+		}
+
+		if (typeof this.setFormatedCurrency === "function") {
+			this.setFormatedCurrency(item, field, null, false, payload);
+		}
+
+		const rawValue = item?.[field];
+		const numericValue =
+			typeof rawValue === "number"
+				? rawValue
+				: parseFloat(formatUtils.fromArabicNumerals(String(rawValue ?? 0))) || 0;
+
+		if (typeof this.calcPrices === "function") {
+			const normalizedEvent = { target: { id: field, value: numericValue } };
+			this.calcPrices(item, numericValue, normalizedEvent);
+		}
+
+		this.$forceUpdate();
+	},
+	handlePricingChange(item, field, event) {
+		this.applyItemPricing(item, field, event);
+	},
+	applyPricingValue(item, field, value) {
+		this.applyItemPricing(item, field, value);
+	},
 	openDetailRateKeypad(item) {
 		if (!item) {
 			return;
@@ -1101,10 +1137,7 @@ export default {
 			title: __("Set Rate"),
 			allowDecimal: true,
 			onConfirm: (value) => {
-				this.setFormatedCurrency(item, "rate", null, false, value);
-				const fakeEvent = { target: { value } };
-				this.calcPrices(item, value, fakeEvent);
-				this.$forceUpdate();
+				this.applyPricingValue(item, "rate", value);
 			},
 		});
 	},
@@ -1117,10 +1150,7 @@ export default {
 			title: __("Set Discount %"),
 			allowDecimal: true,
 			onConfirm: (value) => {
-				this.setFormatedCurrency(item, "discount_percentage", null, false, value);
-				const fakeEvent = { target: { value } };
-				this.calcPrices(item, value, fakeEvent);
-				this.$forceUpdate();
+				this.applyPricingValue(item, "discount_percentage", value);
 			},
 		});
 	},
@@ -1133,10 +1163,7 @@ export default {
 			title: __("Set Discount Amount"),
 			allowDecimal: true,
 			onConfirm: (value) => {
-				this.setFormatedCurrency(item, "discount_amount", null, false, value);
-				const fakeEvent = { target: { value } };
-				this.calcPrices(item, value, fakeEvent);
-				this.$forceUpdate();
+				this.applyPricingValue(item, "discount_amount", value);
 			},
 		});
 	},
@@ -1388,6 +1415,7 @@ export default {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	flex-shrink: 0;
 }
 
 .touch-action-btn {
@@ -1412,8 +1440,31 @@ export default {
 	font-size: 1.4rem !important;
 }
 
+.dialog-close-btn {
+	min-width: 44px !important;
+	min-height: 44px !important;
+	border-radius: 12px !important;
+	box-shadow: 0 2px 6px var(--pos-shadow-light);
+}
+
+.dialog-close-btn :deep(.v-icon) {
+	font-size: 1.1rem !important;
+}
+
 .pos-table__qty-counter {
 	gap: 10px;
+}
+
+.pos-table__qty-counter .minus-btn {
+	order: 1;
+}
+
+.pos-table__qty-counter .pos-table__qty-display {
+	order: 2;
+}
+
+.pos-table__qty-counter .plus-btn {
+	order: 3;
 }
 
 .pos-table :deep(.v-data-table__tbody > tr) {
@@ -2089,7 +2140,7 @@ body[dir="rtl"] .expanded-content .pos-table__qty-counter {
 .expanded-content .pos-table__qty-counter.rtl-layout .plus-btn,
 html[dir="rtl"] .expanded-content .pos-table__qty-counter .plus-btn,
 body[dir="rtl"] .expanded-content .pos-table__qty-counter .plus-btn {
-	order: 3 !important;
+	order: 1 !important;
 	/* Plus button should appear first visually in RTL */
 }
 
@@ -2111,7 +2162,7 @@ body[dir="rtl"] .expanded-content .pos-table__qty-counter .pos-table__qty-displa
 .expanded-content .pos-table__qty-counter.rtl-layout .minus-btn,
 html[dir="rtl"] .expanded-content .pos-table__qty-counter .minus-btn,
 body[dir="rtl"] .expanded-content .pos-table__qty-counter .minus-btn {
-	order: 1 !important;
+	order: 3 !important;
 	/* Minus button should appear last visually in RTL */
 }
 
@@ -2317,7 +2368,7 @@ body[dir="rtl"] .expanded-content .pos-table__qty-display {
 
 .expanded-content.compact-expanded .form-row {
 	flex-direction: column;
-	gap: 8px;
+	gap: 0;
 }
 
 .expanded-content.compact-expanded .form-field {
@@ -3279,7 +3330,7 @@ body[dir="rtl"] .amount-value.right-aligned {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: 10px;
 	padding: 4px;
 	/* More flexible sizing for larger numbers */
 	min-width: 130px;
@@ -3327,7 +3378,7 @@ body[dir="rtl"] .pos-table__qty-counter {
 .pos-table__qty-counter.rtl-layout .plus-btn,
 html[dir="rtl"] .pos-table__qty-counter .plus-btn,
 body[dir="rtl"] .pos-table__qty-counter .plus-btn {
-	order: 3 !important;
+	order: 1 !important;
 	/* Plus button should appear first visually */
 }
 
@@ -3349,7 +3400,7 @@ body[dir="rtl"] .pos-table__qty-counter .pos-table__qty-display {
 .pos-table__qty-counter.rtl-layout .minus-btn,
 html[dir="rtl"] .pos-table__qty-counter .minus-btn,
 body[dir="rtl"] .pos-table__qty-counter .minus-btn {
-	order: 1 !important;
+	order: 3 !important;
 	/* Minus button should appear last visually */
 }
 
@@ -3414,6 +3465,9 @@ body[dir="rtl"] .number-field-rtl {
 	/* Better number display */
 	letter-spacing: -0.02em;
 	word-spacing: -0.1em;
+	cursor: pointer;
+	user-select: none;
+	outline: none;
 }
 
 .qty-display-text {
@@ -3434,11 +3488,6 @@ body[dir="rtl"] .number-field-rtl {
 	font-size: 28px !important;
 }
 
-.qty-keypad-btn {
-	background-color: rgba(var(--v-theme-primary), 0.08) !important;
-	color: rgb(var(--v-theme-primary)) !important;
-}
-
 /* Special handling for very large numbers */
 .pos-table__qty-display.large-number {
 	min-width: 100px;
@@ -3453,6 +3502,16 @@ body[dir="rtl"] .number-field-rtl {
 	color: var(--pos-error);
 	background: var(--pos-error-container);
 	border-color: var(--pos-error);
+}
+
+.pos-table__qty-display.is-disabled {
+	cursor: not-allowed;
+	opacity: 0.75;
+}
+
+.pos-table__qty-display.is-disabled:focus-visible {
+	box-shadow: none;
+	border-color: var(--pos-border-light);
 }
 
 /* Dynamic container expansion for larger numbers */
@@ -3486,6 +3545,11 @@ body[dir="rtl"] .number-field-rtl {
 	font-size: 0.7rem;
 	min-width: 70px;
 	max-width: 100px;
+}
+
+.pos-table__qty-display:focus-visible {
+	box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.35);
+	border-color: rgb(var(--v-theme-primary));
 }
 
 .qty-control-btn:hover {

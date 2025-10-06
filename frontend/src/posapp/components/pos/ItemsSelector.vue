@@ -18,7 +18,7 @@
 				<v-icon class="mr-3">mdi-shopping</v-icon>
 				<span class="text-h6">{{ __("Select Items") }}</span>
 				<v-spacer></v-spacer>
-				<v-btn icon="mdi-close" variant="text" @click="showModal = false"></v-btn>
+				<v-btn icon="mdi-close" variant="tonal" color="primary" class="selector-close-btn" @click="showModal = false"></v-btn>
 			</v-card-title>
 			<v-divider></v-divider>
 			<v-card-text class="pa-0">
@@ -91,7 +91,7 @@
 														<v-card-title class="text-h6 pa-4 d-flex align-center">
 															<span>{{ __("Item Selector Settings") }}</span>
 															<v-spacer></v-spacer>
-															<v-btn icon="mdi-close" variant="text" density="compact" @click="show_item_settings = false">
+											<v-btn icon="mdi-close" variant="tonal" color="primary" density="compact" class="selector-close-btn" @click="show_item_settings = false">
 															</v-btn>
 														</v-card-title>
 														<v-divider></v-divider>
@@ -3410,6 +3410,17 @@ export default {
 	min-height: 56px;
 	padding: 12px 20px;
 	font-size: 1rem;
+}
+
+.selector-close-btn {
+	min-width: 44px !important;
+	min-height: 44px !important;
+	border-radius: 12px !important;
+	box-shadow: 0 2px 6px var(--pos-shadow-light, rgba(0, 0, 0, 0.15));
+}
+
+.selector-close-btn :deep(.v-icon) {
+	font-size: 1.1rem !important;
 }
 
 .select-items-trigger-btn {
