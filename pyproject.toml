@@ -66,8 +66,3 @@ docstring-code-format = true
 line-length = 110
 target-version = ["py310"]
 
-
-[project.urls]
-Homepage = "https://github.com/defendicon/POS-Awesome-V15"
-Repository = "https://github.com/defendicon/POS-Awesome-V15.git"
-"Bug Reports" = "https://github.com/defendicon/POS-Awesome-V15/issues"
