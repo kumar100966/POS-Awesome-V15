@@ -1,0 +1,245 @@
+
+/* Card background adjustments */
+.cards {
+	background-color: var(--surface-secondary) !important;
+}
+
+/* Style for selected checkbox button */
+.v-checkbox-btn.v-selected {
+	background-color: var(--submit-start) !important;
+	color: white;
+}
+
+/* Bottom border for elements */
+.border_line_bottom {
+	border-bottom: 1px solid var(--field-border);
+}
+
+/* Disable pointer events for elements */
+.disable-events {
+	pointer-events: none;
+}
+
+/* Style for customer balance field */
+:deep(.balance-field) {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex-wrap: nowrap;
+}
+
+/* Style for balance value text */
+:deep(.balance-value) {
+	font-size: 1.5rem;
+	font-weight: bold;
+	color: var(--primary-start);
+	margin-left: var(--dynamic-xs);
+}
+
+/* Red border and label for return mode card */
+
+/* Red border and label for return mode card */
+
+.return-mode {
+	border: 2px solid rgb(var(--v-theme-error)) !important;
+	position: relative;
+}
+
+/* Label for return mode card */
+.return-mode::before {
+	content: "RETURN";
+	position: absolute;
+	top: 0;
+	right: 0;
+	background-color: rgb(var(--v-theme-error));
+	color: white;
+	padding: 4px 12px;
+	font-weight: bold;
+	border-bottom-left-radius: 8px;
+	z-index: 1;
+}
+
+/* Dynamic padding for responsive layout */
+.dynamic-padding {
+	/* Uniform spacing for better alignment */
+	padding: var(--dynamic-sm);
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+	.dynamic-padding {
+		/* Smaller uniform padding on tablets */
+		padding: var(--dynamic-xs);
+	}
+
+	.dynamic-padding .v-row {
+		margin: 0 -2px;
+	}
+
+	.dynamic-padding .v-col {
+		padding: 2px 4px;
+	}
+
+	.items-table-wrapper {
+		/* Adjust for smaller padding on tablets */
+		margin-left: calc(-1 * var(--dynamic-xs));
+		margin-right: calc(-1 * var(--dynamic-xs));
+		width: calc(100% + 2 * var(--dynamic-xs));
+		max-width: calc(100% + 2 * var(--dynamic-xs));
+	}
+
+	.item-search-field {
+		max-width: 100%;
+	}
+
+	.column-selector-actions {
+		width: 100%;
+		justify-content: flex-start;
+	}
+}
+
+@media (max-width: 480px) {
+	.dynamic-padding {
+		padding: var(--dynamic-xs);
+	}
+
+	.dynamic-padding .v-row {
+		margin: 0 -1px;
+	}
+
+	.dynamic-padding .v-col {
+		padding: 1px 2px;
+	}
+
+	.items-table-wrapper {
+		/* Adjust for smallest screens */
+		margin-left: calc(-1 * var(--dynamic-xs));
+		margin-right: calc(-1 * var(--dynamic-xs));
+		width: calc(100% + 2 * var(--dynamic-xs));
+		max-width: calc(100% + 2 * var(--dynamic-xs));
+	}
+
+	.item-search-field {
+		flex-basis: 100%;
+		max-width: 100%;
+		margin-right: 0;
+	}
+
+	.column-selector-actions {
+		width: 100%;
+		justify-content: flex-start;
+	}
+}
+
+.column-selector-container {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 8px 16px;
+	background-color: var(--pos-card-bg);
+	border-radius: 8px 8px 0 0;
+	box-sizing: border-box;
+	margin-bottom: 8px;
+}
+
+.column-selector-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 8px;
+	flex: 0 0 auto;
+}
+
+.item-search-field {
+	width: 100%;
+	max-width: 100%;
+	flex: 1 1 280px;
+	min-width: 0;
+}
+
+.column-selector-btn {
+	font-size: 0.875rem;
+}
+
+.invoice-layout {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.invoice-content-grid {
+	display: flex;
+	flex: 1 1 auto;
+	gap: var(--dynamic-sm);
+	align-items: stretch;
+}
+
+.invoice-content-left,
+.invoice-content-right {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.invoice-content-left {
+	flex: 2 1 0;
+}
+
+.invoice-content-left>.v-card {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.invoice-content-right {
+	flex: 0 1 360px;
+	max-width: 360px;
+}
+
+.invoice-content-right>* {
+	flex: 1 1 auto;
+}
+
+@media (max-width: 1280px) {
+	.invoice-content-grid {
+		flex-direction: column;
+	}
+
+	.invoice-content-right {
+		flex: 1 1 auto;
+		max-width: 100%;
+	}
+}
+
+.items-table-wrapper {
+	position: relative;
+	margin-top: var(--dynamic-sm);
+	/* Override parent padding to make table full-width */
+	margin-left: calc(-1 * var(--dynamic-sm));
+	margin-right: calc(-1 * var(--dynamic-sm));
+	width: calc(100% + 2 * var(--dynamic-sm));
+	max-width: calc(100% + 2 * var(--dynamic-sm));
+	box-sizing: border-box;
+}
+
+/* New styles for improved column switches */
+:deep(.column-switch) {
+	margin: 0;
+	padding: 0;
+}
+
+:deep(.column-switch .v-switch__track) {
+	opacity: 0.7;
+}
+
+:deep(.column-switch .v-switch__thumb) {
+	transform: scale(0.8);
+}
+
+:deep(.column-switch .v-label) {
+	opacity: 0.9;
+	font-size: 0.95rem;
+}

@@ -1,0 +1,11 @@
+
+/* Main navigation container styles - scoped to POSApp */
+.posapp nav {
+	position: relative;
+	z-index: 1000;
+}
+
+/* Snackbar positioning - scoped to POSApp */
+.posapp :deep(.v-snackbar) {
+	z-index: 9999;
+}

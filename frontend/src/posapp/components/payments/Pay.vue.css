@@ -1,0 +1,24 @@
+
+input[total_of_diff] {
+	text-align: right;
+}
+
+input[payments_methods] {
+	text-align: right;
+}
+
+input[total_selected_payments] {
+	text-align: right;
+}
+
+input[total_selected_invoices] {
+	text-align: right;
+}
+
+input[total_selected_mpesa_payments] {
+	text-align: right;
+}
+
+.selected-row {
+	background-color: #e3f2fd !important;
+}

@@ -1,0 +1,45 @@
+
+.pos-main-container {
+	min-height: 100vh;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.dynamic-container {
+	/* add space for the navbar with better spacing */
+	/*padding-top: calc(25px + var(--dynamic-lg));*/
+	/* Navbar height (25px) + larger spacing */
+	transition: all 0.3s ease;
+}
+
+.dynamic-main-row {
+	flex: 1 1 auto;
+	overflow: hidden;
+	min-height: 0;
+	padding: 0;
+	margin: 0;
+}
+
+.dynamic-col {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	padding: var(--dynamic-sm);
+	transition: padding 0.3s ease;
+	margin-top: var(--dynamic-sm);
+	/* Add top margin for better separation */
+}
+
+@media (max-width: 768px) {
+	.dynamic-container {
+		padding-top: calc(56px + var(--dynamic-md));
+		/* Consistent navbar height + medium spacing */
+	}
+
+	.dynamic-col {
+		padding: var(--dynamic-xs);
+		margin-top: var(--dynamic-xs);
+	}
+}

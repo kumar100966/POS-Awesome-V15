@@ -1,0 +1,209 @@
+
+.cards {
+	background-color: var(--pos-card-bg) !important;
+	transition: all 0.3s ease;
+}
+
+.white-text-btn {
+	color: var(--pos-text-primary) !important;
+}
+
+.white-text-btn :deep(.v-btn__content) {
+	color: var(--pos-text-primary) !important;
+}
+
+/* Enhanced button styling with better performance */
+.summary-btn {
+	transition: all 0.2s ease !important;
+	position: relative;
+	overflow: hidden;
+	color: #fff !important;
+	min-height: 56px !important;
+	font-size: 1.05rem !important;
+	padding: 14px 18px !important;
+	border-radius: 14px !important;
+}
+
+.summary-btn :deep(.v-btn__content) {
+	white-space: normal !important;
+	transition: all 0.2s ease;
+	color: inherit !important;
+	font-weight: 600;
+}
+
+.summary-btn:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.summary-btn:hover,
+.summary-btn:focus-visible {
+	color: #fff !important;
+}
+
+.summary-btn:hover :deep(.v-btn__content),
+.summary-btn:focus-visible :deep(.v-btn__content) {
+	color: inherit !important;
+}
+
+.white-text-btn.summary-btn,
+.white-text-btn.summary-btn :deep(.v-btn__content) {
+	color: var(--pos-text-primary) !important;
+}
+
+.summary-btn:active {
+	transform: translateY(0);
+}
+
+/* Special styling for the PAY button */
+.pay-btn {
+	font-weight: 600 !important;
+	font-size: 1.1rem !important;
+	background: linear-gradient(135deg, #4caf50, #45a049) !important;
+	box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3) !important;
+}
+
+.pay-btn:hover {
+	background: linear-gradient(135deg, #45a049, #3d8b40) !important;
+	box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4) !important;
+	transform: translateY(-2px);
+}
+
+/* Enhanced field styling */
+.summary-field {
+	transition: all 0.2s ease;
+}
+
+.summary-field:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.touch-keypad-btn {
+	min-width: 44px !important;
+	height: 44px !important;
+	border-radius: 12px !important;
+}
+
+.touch-keypad-btn :deep(.v-icon) {
+	font-size: 28px !important;
+}
+
+.summary-field--metric :deep(.v-field__input) {
+	font-size: 1.25rem !important;
+	font-weight: 600 !important;
+}
+
+.summary-field--metric :deep(.v-field__label) {
+	font-size: 1rem !important;
+	font-weight: 500 !important;
+}
+
+.summary-metric-col {
+	margin-bottom: 6px;
+}
+
+.summary-metric-card {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 16px 18px;
+	border-radius: 14px;
+	background: rgba(var(--v-theme-surface), 0.95);
+	border: 1px solid rgba(var(--v-theme-outline), 0.16);
+	box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+	width: 100%;
+}
+
+.summary-metric-card__icon {
+	color: rgba(var(--v-theme-primary));
+}
+
+.summary-metric-card__label {
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: rgba(var(--v-theme-on-surface), 0.68);
+}
+
+.summary-metric-card__value {
+	font-size: 2rem;
+	font-weight: 700;
+	color: rgba(var(--v-theme-primary));
+	letter-spacing: -0.03em;
+}
+
+.summary-section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--dynamic-sm);
+}
+
+.summary-totals :deep(.v-row) {
+	display: flex;
+	flex-direction: column;
+	row-gap: 10px;
+}
+
+.summary-section :deep(.v-row) {
+	margin: 0;
+}
+
+.summary-section :deep(.v-col) {
+	padding: 4px 6px;
+}
+
+.summary-divider {
+	margin: var(--dynamic-sm) 0;
+}
+
+.summary-actions :deep(.v-col) {
+	display: flex;
+}
+
+.summary-actions :deep(.v-btn) {
+	flex: 1 1 auto;
+}
+
+/* Responsive optimizations */
+@media (max-width: 768px) {
+	.summary-btn {
+		font-size: 0.875rem !important;
+		padding: 8px 12px !important;
+	}
+
+	.pay-btn {
+		font-size: 1rem !important;
+	}
+
+	.summary-field {
+		font-size: 0.875rem;
+	}
+}
+
+@media (max-width: 480px) {
+	.summary-btn {
+		font-size: 0.8rem !important;
+		padding: 6px 8px !important;
+	}
+
+	.pay-btn {
+		font-size: 0.95rem !important;
+	}
+}
+
+/* Loading state animations */
+.summary-btn:deep(.v-btn__loader) {
+	opacity: 0.8;
+}
+
+/* Dark theme enhancements */
+:deep([data-theme="dark"]) .summary-btn,
+:deep(.v-theme--dark) .summary-btn {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+:deep([data-theme="dark"]) .summary-btn:hover,
+:deep(.v-theme--dark) .summary-btn:hover {
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}

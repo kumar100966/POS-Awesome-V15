@@ -1,0 +1,68 @@
+
+.numeric-keypad-card {
+	border-radius: 20px;
+	overflow: hidden;
+}
+
+.numeric-keypad-title {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-weight: 600;
+}
+
+.numeric-keypad-body {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 16px;
+}
+
+.numeric-keypad-display {
+	width: 100%;
+	padding: 16px;
+	border-radius: 12px;
+	text-align: right;
+	font-size: 1.8rem;
+	font-weight: 600;
+	background-color: rgba(var(--v-theme-surface-variant), 0.35);
+	color: rgb(var(--v-theme-on-surface));
+	letter-spacing: 0.04em;
+}
+
+.numeric-keypad-helper {
+	font-size: 0.85rem;
+	color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.numeric-keypad-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+	padding: 20px;
+}
+
+.numeric-keypad-button {
+	font-size: 1.1rem;
+	font-weight: 600;
+	height: 54px;
+	border-radius: 12px !important;
+}
+
+.numeric-keypad-button :deep(.v-btn__content) {
+	width: 100%;
+	justify-content: center;
+}
+
+.numeric-keypad-button--full {
+	grid-column: span 3;
+}
+
+.numeric-keypad-close {
+	background-color: rgba(var(--v-theme-primary), 0.12) !important;
+	color: rgb(var(--v-theme-primary)) !important;
+	border-radius: 12px !important;
+	width: 44px !important;
+	height: 44px !important;
+}
