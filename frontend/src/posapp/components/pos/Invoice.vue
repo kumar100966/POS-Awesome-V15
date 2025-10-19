@@ -13,165 +13,148 @@
 					resize: 'vertical',
 					overflow: 'auto',
 				}" :class="['cards my-0 py-0 mt-3 resizable', 'pos-themed-card', { 'return-mode': isReturnInvoice }]" @mouseup="saveInvoiceHeight" @touchend="saveInvoiceHeight">
-				<!-- Dynamic padding wrapper -->
-				<div class="dynamic-padding">
-					<v-alert type="info" density="compact" class="mb-2" v-if="pos_profile.create_pos_invoice_instead_of_sales_invoice">
-						{{ __("Invoices saved as POS Invoices") }}
-					</v-alert>
-					<!-- Top Row: Customer Selection and Invoice Type -->
-					<v-row align="center" class="items px-3 py-2">
-						<v-col :cols="pos_profile.posa_allow_sales_order ? 9 : 12" class="pb-0 pr-0">
-							<!-- Customer selection component -->
-							<Customer />
-						</v-col>
-						<!-- Invoice Type Selection (Only shown if sales orders are allowed) -->
-						<v-col v-if="pos_profile.posa_allow_sales_order" cols="3" class="pb-4">
-							<v-select density="compact" hide-details variant="solo" color="primary" class="sleek-field pos-themed-input" :items="invoiceTypes" :label="frappe._('Type')" v-model="invoiceType" :disabled="invoiceType == 'Return'"></v-select>
-						</v-col>
-					</v-row>
+					<!-- Dynamic padding wrapper -->
+					<div class="dynamic-padding">
+						<!-- Top Row: Customer Selection and Invoice Type -->
+						<v-row align="center" class="items px-3 py-2">
+							<v-col :cols="pos_profile.posa_allow_sales_order ? 9 : 12" class="pb-0 pr-0">
+								<!-- Customer selection component -->
+								<Customer />
+							</v-col>
+							<!-- Invoice Type Selection (Only shown if sales orders are allowed) -->
+							<v-col v-if="pos_profile.posa_allow_sales_order" cols="3" class="pb-4">
+								<v-select density="compact" hide-details variant="solo" color="primary" class="sleek-field pos-themed-input" :items="invoiceTypes" :label="frappe._('Type')" v-model="invoiceType" :disabled="invoiceType == 'Return'"></v-select>
+							</v-col>
+						</v-row>
 
-					<!-- Delivery Charges Section (Only if enabled in POS profile) -->
-					<DeliveryCharges :pos_profile="pos_profile" :delivery_charges="delivery_charges" :selected_delivery_charge="selected_delivery_charge" :delivery_charges_rate="delivery_charges_rate" :deliveryChargesFilter="deliveryChargesFilter" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :readonly="readonly" @update:selected_delivery_charge="
-						(val) => {
-							selected_delivery_charge = val;
-							update_delivery_charges();
-						}
-					" />
+						<!-- Delivery Charges Section (Only if enabled in POS profile) -->
+						<DeliveryCharges :pos_profile="pos_profile" :delivery_charges="delivery_charges" :selected_delivery_charge="selected_delivery_charge" :delivery_charges_rate="delivery_charges_rate" :deliveryChargesFilter="deliveryChargesFilter" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :readonly="readonly" @update:selected_delivery_charge="
+							(val) => {
+								selected_delivery_charge = val;
+								update_delivery_charges();
+							}
+						" />
 
-					<!-- Posting Date and Customer Balance Section -->
-					<PostingDateRow :pos_profile="pos_profile" :posting_date_display="posting_date_display" :customer_balance="customer_balance" :price-list="selected_price_list" :price-lists="price_lists" :formatCurrency="formatCurrency" @update:posting_date_display="
-						(val) => {
-							posting_date_display = val;
-						}
-					" @update:priceList="
+						<!-- Posting Date and Customer Balance Section -->
+						<PostingDateRow :pos_profile="pos_profile" :posting_date_display="posting_date_display" :customer_balance="customer_balance" :price-list="selected_price_list" :price-lists="price_lists" :formatCurrency="formatCurrency" @update:posting_date_display="
+							(val) => {
+								posting_date_display = val;
+							}
+						" @update:priceList="
 						(val) => {
 							selected_price_list = val;
 						}
 					" />
 
-					<!-- Multi-Currency Section (Only if enabled in POS profile) -->
-					<MultiCurrencyRow :pos_profile="pos_profile" :selected_currency="selected_currency" :plc_conversion_rate="exchange_rate" :conversion_rate="conversion_rate" :available_currencies="available_currencies" :isNumber="isNumber" :price_list_currency="price_list_currency" @update:selected_currency="
-						(val) => {
-							selected_currency = val;
-							update_currency(val);
-						}
-					" @update:plc_conversion_rate="
+						<!-- Multi-Currency Section (Only if enabled in POS profile) -->
+						<MultiCurrencyRow :pos_profile="pos_profile" :selected_currency="selected_currency" :plc_conversion_rate="exchange_rate" :conversion_rate="conversion_rate" :available_currencies="available_currencies" :isNumber="isNumber" :price_list_currency="price_list_currency" @update:selected_currency="
+							(val) => {
+								selected_currency = val;
+								update_currency(val);
+							}
+						" @update:plc_conversion_rate="
 						(val) => {
 							exchange_rate = val;
 							update_exchange_rate();
 						}
 					" @update:conversion_rate="
-							(val) => {
-								conversion_rate = val;
-								update_conversion_rate();
-							}
-						" />
+						(val) => {
+							conversion_rate = val;
+							update_conversion_rate();
+						}
+					" />
 
-					<!-- Items Table Section (Main items list for invoice) -->
-					<div class="items-table-wrapper">
-						<!-- Column selector button moved outside the table -->
-						<div class="column-selector-container">
-							<v-text-field
-								ref="itemSearchInput"
-								v-model="itemSearch"
-								density="compact"
-								variant="solo"
-								color="primary"
-								class="item-search-field pos-themed-input"
-								:label="__('Search items or barcode')"
-								prepend-inner-icon="mdi-magnify"
-								hide-details
-								clearable
-								autocomplete="off"
-								@keydown.enter.prevent="handleItemSearchSubmit"
-								@keydown.numpad-enter.prevent="handleItemSearchSubmit"
-							></v-text-field>
-							<div class="column-selector-actions">
-								<ItemsSelector />
-								<v-btn density="compact" variant="text" color="primary" prepend-icon="mdi-cog-outline" @click="toggleColumnSelection" class="column-selector-btn">
-									{{ __("Columns") }}
-								</v-btn>
+						<!-- Items Table Section (Main items list for invoice) -->
+						<div class="items-table-wrapper">
+							<!-- Column selector button moved outside the table -->
+							<div class="column-selector-container">
+								<v-text-field ref="itemSearchInput" v-model="itemSearch" density="compact" variant="solo" color="primary" class="item-search-field pos-themed-input" :label="__('Search items or barcode')" prepend-inner-icon="mdi-magnify" hide-details clearable autocomplete="off" @keydown.enter.prevent="handleItemSearchSubmit" @keydown.numpad-enter.prevent="handleItemSearchSubmit"></v-text-field>
+								<div class="column-selector-actions">
+									<ItemsSelector />
+									<v-btn density="compact" variant="text" color="primary" prepend-icon="mdi-cog-outline" @click="toggleColumnSelection" class="column-selector-btn">
+										{{ __("Columns") }}
+									</v-btn>
+								</div>
+
+								<v-dialog v-model="show_column_selector" max-width="500px" attach="body">
+									<v-card>
+										<v-card-title class="text-h6 pa-4 d-flex align-center">
+											<span>{{ __("Select Columns to Display") }}</span>
+											<v-spacer></v-spacer>
+											<v-btn icon="mdi-close" variant="text" density="compact" @click="show_column_selector = false"></v-btn>
+										</v-card-title>
+										<v-divider></v-divider>
+										<v-card-text class="pa-4">
+											<v-row dense>
+												<v-col cols="12" v-for="column in available_columns.filter((col) => !col.required)" :key="column.key">
+													<v-switch v-model="temp_selected_columns" :label="column.title" :value="column.key" hide-details density="compact" color="primary" class="column-switch mb-1" :disabled="column.required"></v-switch>
+												</v-col>
+											</v-row>
+											<div class="text-caption mt-2">
+												{{ __("Required columns cannot be hidden") }}
+											</div>
+										</v-card-text>
+										<v-card-actions class="pa-4 pt-0">
+											<v-btn color="error" variant="text" @click="cancelColumnSelection">{{
+												__("Cancel")
+												}}</v-btn>
+											<v-spacer></v-spacer>
+											<v-btn color="primary" variant="tonal" @click="updateSelectedColumns">{{
+												__("Apply")
+												}}</v-btn>
+										</v-card-actions>
+									</v-card>
+								</v-dialog>
 							</div>
 
-							<v-dialog v-model="show_column_selector" max-width="500px" attach="body">
+							<!-- ItemsTable component with reorder event handler -->
+							<ItemsTable ref="itemsTable" :headers="items_headers" :items="items" v-model:expanded="expanded" :itemsPerPage="itemsPerPage" :itemSearch="itemSearch" :pos_profile="pos_profile" :invoice_doc="invoice_doc" :invoiceType="invoiceType" :stock_settings="stock_settings" :displayCurrency="displayCurrency" :formatFloat="formatFloat" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :isNumber="isNumber" :setFormatedQty="setFormatedQty" :setFormatedCurrency="setFormatedCurrency" :calcPrices="calc_prices" :calcUom="calc_uom" :setSerialNo="set_serial_no" :setBatchQty="set_batch_qty" :validateDueDate="validate_due_date" :removeItem="remove_item" :subtractOne="subtract_one" :addOne="add_one" :toggleOffer="toggleOffer" :changePriceListRate="change_price_list_rate" :isNegative="isNegative" @update:expanded="handleExpandedUpdate" @reorder-items="handleItemReorder" @add-item-from-drag="handleItemDrop" @show-drop-feedback="showDropFeedback" @item-dropped="showDropFeedback(false)" @view-packed="openPackedItems" @stock-limit-reached="handleStockLimitWarning" />
+							<v-dialog v-model="show_packed_dialog" max-width="800px" attach="body">
 								<v-card>
-									<v-card-title class="text-h6 pa-4 d-flex align-center">
-										<span>{{ __("Select Columns to Display") }}</span>
+									<v-card-title class="d-flex align-center">
+										<span>{{ __("Packing List") }} ({{ packed_dialog_items.length }})</span>
 										<v-spacer></v-spacer>
-										<v-btn icon="mdi-close" variant="text" density="compact" @click="show_column_selector = false"></v-btn>
+										<v-btn icon="mdi-close" variant="text" density="compact" @click="show_packed_dialog = false"></v-btn>
 									</v-card-title>
 									<v-divider></v-divider>
-									<v-card-text class="pa-4">
-										<v-row dense>
-											<v-col cols="12" v-for="column in available_columns.filter((col) => !col.required)" :key="column.key">
-												<v-switch v-model="temp_selected_columns" :label="column.title" :value="column.key" hide-details density="compact" color="primary" class="column-switch mb-1" :disabled="column.required"></v-switch>
-											</v-col>
-										</v-row>
-										<div class="text-caption mt-2">
-											{{ __("Required columns cannot be hidden") }}
-										</div>
+									<v-card-text>
+										<v-alert type="warning" density="compact" class="mb-2">
+											{{
+												__(
+													"For 'Product Bundle' items, Warehouse, Serial No and Batch No will be considered from the 'Packing List' table. If Warehouse and Batch No are same for all packing items for any 'Product Bundle' item, those values can be entered in the main Item table; values will be copied to 'Packing List' table.",
+												)
+											}}
+										</v-alert>
+										<v-data-table :headers="packedItemsHeaders" :items="packed_dialog_items" class="elevation-1" hide-default-footer density="compact">
+											<template v-slot:item.index="{ index }">
+												{{ index + 1 }}
+											</template>
+											<template v-slot:item.qty="{ item }">
+												{{ formatFloat(item.qty) }}
+											</template>
+											<template v-slot:item.rate="{ item }">
+												<div class="currency-display">
+													<span class="currency-symbol">{{
+														currencySymbol(displayCurrency)
+														}}</span>
+													<span class="amount-value">{{ formatCurrency(item.rate) }}</span>
+												</div>
+											</template>
+											<template v-slot:item.warehouse="{ item }">
+												<v-text-field v-model="item.warehouse" hide-details density="compact" />
+											</template>
+											<template v-slot:item.batch_no="{ item }">
+												<v-text-field v-model="item.batch_no" hide-details density="compact" />
+											</template>
+											<template v-slot:item.serial_no="{ item }">
+												<v-text-field v-model="item.serial_no" hide-details density="compact" />
+											</template>
+										</v-data-table>
 									</v-card-text>
-									<v-card-actions class="pa-4 pt-0">
-										<v-btn color="error" variant="text" @click="cancelColumnSelection">{{
-											__("Cancel")
-										}}</v-btn>
-										<v-spacer></v-spacer>
-										<v-btn color="primary" variant="tonal" @click="updateSelectedColumns">{{
-											__("Apply")
-										}}</v-btn>
-									</v-card-actions>
 								</v-card>
 							</v-dialog>
 						</div>
-
-						<!-- ItemsTable component with reorder event handler -->
-						<ItemsTable ref="itemsTable" :headers="items_headers" :items="items" v-model:expanded="expanded" :itemsPerPage="itemsPerPage" :itemSearch="itemSearch" :pos_profile="pos_profile" :invoice_doc="invoice_doc" :invoiceType="invoiceType" :stock_settings="stock_settings" :displayCurrency="displayCurrency" :formatFloat="formatFloat" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :isNumber="isNumber" :setFormatedQty="setFormatedQty" :setFormatedCurrency="setFormatedCurrency" :calcPrices="calc_prices" :calcUom="calc_uom" :setSerialNo="set_serial_no" :setBatchQty="set_batch_qty" :validateDueDate="validate_due_date" :removeItem="remove_item" :subtractOne="subtract_one" :addOne="add_one" :toggleOffer="toggleOffer" :changePriceListRate="change_price_list_rate" :isNegative="isNegative" @update:expanded="handleExpandedUpdate" @reorder-items="handleItemReorder" @add-item-from-drag="handleItemDrop" @show-drop-feedback="showDropFeedback" @item-dropped="showDropFeedback(false)" @view-packed="openPackedItems" @stock-limit-reached="handleStockLimitWarning" />
-						<v-dialog v-model="show_packed_dialog" max-width="800px" attach="body">
-							<v-card>
-								<v-card-title class="d-flex align-center">
-									<span>{{ __("Packing List") }} ({{ packed_dialog_items.length }})</span>
-									<v-spacer></v-spacer>
-									<v-btn icon="mdi-close" variant="text" density="compact" @click="show_packed_dialog = false"></v-btn>
-								</v-card-title>
-								<v-divider></v-divider>
-								<v-card-text>
-									<v-alert type="warning" density="compact" class="mb-2">
-										{{
-											__(
-												"For 'Product Bundle' items, Warehouse, Serial No and Batch No will be considered from the 'Packing List' table. If Warehouse and Batch No are same for all packing items for any 'Product Bundle' item, those values can be entered in the main Item table; values will be copied to 'Packing List' table.",
-											)
-										}}
-									</v-alert>
-									<v-data-table :headers="packedItemsHeaders" :items="packed_dialog_items" class="elevation-1" hide-default-footer density="compact">
-										<template v-slot:item.index="{ index }">
-											{{ index + 1 }}
-										</template>
-										<template v-slot:item.qty="{ item }">
-											{{ formatFloat(item.qty) }}
-										</template>
-										<template v-slot:item.rate="{ item }">
-											<div class="currency-display">
-												<span class="currency-symbol">{{
-													currencySymbol(displayCurrency)
-												}}</span>
-												<span class="amount-value">{{ formatCurrency(item.rate) }}</span>
-											</div>
-										</template>
-										<template v-slot:item.warehouse="{ item }">
-											<v-text-field v-model="item.warehouse" hide-details density="compact" />
-										</template>
-										<template v-slot:item.batch_no="{ item }">
-											<v-text-field v-model="item.batch_no" hide-details density="compact" />
-										</template>
-										<template v-slot:item.serial_no="{ item }">
-											<v-text-field v-model="item.serial_no" hide-details density="compact" />
-										</template>
-									</v-data-table>
-								</v-card-text>
-							</v-card>
-						</v-dialog>
-						</div>
-				</div>
+					</div>
 				</v-card>
 			</div>
 			<div class="invoice-content-right">

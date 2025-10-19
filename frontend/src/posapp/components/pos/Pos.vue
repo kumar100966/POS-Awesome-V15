@@ -187,8 +187,9 @@ export default {
 
 <style scoped>
 .pos-main-container {
-	min-height: 100vh;
-	height: 100vh;
+	flex: 1 1 auto;
+	height: 100%;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;

@@ -6,6 +6,7 @@
 	box-shadow: 0 2px 8px var(--pos-shadow);
 	border: 1px solid var(--pos-border);
 	height: 100%;
+	max-height: var(--items-table-max-height, 100%);
 	width: 100%;
 	max-width: 100%;
 	display: flex;
@@ -18,15 +19,18 @@
 
 .pos-table :deep(.v-data-table__wrapper) {
 	flex: 1 1 auto;
-	max-height: 100%;
+	max-height: var(--items-table-max-height, 100%);
 	min-height: 0;
+	overflow-y: auto;
 }
 
 /* Ensure items table can scroll when many rows exist */
 .items-table-container {
 	overflow-y: auto;
+	overflow-x: auto;
 	width: 100%;
-	max-width: 100%;
+	max-width: 100vw;
+	min-height: 0;
 	margin: 0;
 	padding: 0;
 	box-sizing: border-box;
@@ -1869,6 +1873,15 @@ body[dir="rtl"] .amount-value.right-aligned {
 	text-align: center;
 }
 
+.pos-table :deep(th[data-column-key="drag_handle"]),
+.pos-table :deep(td[data-column-key="drag_handle"]) {
+	min-width: 48px !important;
+	max-width: 48px !important;
+	width: 48px !important;
+	text-align: center !important;
+	padding: 8px 4px !important;
+}
+
 .pos-table :deep(th[data-column-key="actions"]),
 .pos-table :deep(td[data-column-key="actions"]) {
 	min-width: 80px;
@@ -1906,9 +1919,12 @@ body[dir="rtl"] .amount-value.right-aligned {
 }
 
 .drag-handle-cell {
-	width: 40px;
+	width: 48px;
 	text-align: center;
 	padding: 8px 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .drag-handle {

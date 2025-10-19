@@ -1,6 +1,22 @@
 <template>
 	<div ref="tableContainer" class="my-0 py-0 overflow-y-auto items-table-container responsive-table-container pos-themed-card" :style="containerStyles" :class="containerClasses" @dragover="onDragOverFromSelector($event)" @drop="onDropFromSelector($event)" @dragenter="onDragEnterFromSelector" @dragleave="onDragLeaveFromSelector">
 		<v-data-table :headers="responsiveHeaders" :items="items" :expanded="expanded" item-value="posa_row_id" class="pos-table elevation-2 pos-themed-card" :class="tableClasses" :items-per-page="itemsPerPage || -1" expand-on-click :density="tableDensity" hide-default-footer :single-expand="true" :header-props="dynamicHeaderProps" :no-data-text="__('No items in cart')" @update:expanded="handleExpandedUpdate" :search="itemSearch" :custom-filter="customItemFilter">
+			<!-- Drag handle column -->
+			<template #item.drag_handle="{ item }">
+				<div class="drag-handle-cell">
+					<v-icon
+						class="drag-handle"
+						icon="mdi-drag"
+						draggable="true"
+						@mousedown.stop
+						@mouseup.stop
+						@touchstart.stop
+						@touchend.stop
+						@dragstart="onRowHandleDragStart($event)"
+						@dragend="onRowHandleDragEnd($event)"
+					/>
+				</div>
+			</template>
 			<!-- UOM column -->
 			<template v-slot:item.uom="{ item }">
 				<div class="pos-table__uom-wrapper">
@@ -517,6 +533,9 @@ export default {
 			draggedIndex: null,
 			dragOverIndex: null,
 			isDragging: false,
+			rowDragCleanup: [],
+			rowElements: [],
+			debouncedSetupRowDragging: null,
 			pendingAdd: null,
 			editNameDialog: false,
 			editNameTarget: null,
@@ -532,6 +551,9 @@ export default {
 			columnVisibility: new Map(),
 			// Performance optimization caches
 			qtyLengthCache: new Map(),
+			viewportWidth: typeof window !== "undefined" ? window.innerWidth : 0,
+			availableHeight: null,
+			viewportResizeHandler: null,
 			prefersTouchKeypad: false,
 			numericKeypad: {
 				visible: false,
@@ -552,14 +574,38 @@ export default {
 		};
 	},
 	computed: {
+		tableMaxHeight() {
+			if (this.availableHeight && this.availableHeight > 0) {
+				return `${Math.round(this.availableHeight)}px`;
+			}
+
+			if (this.containerHeight && this.containerHeight > 0) {
+				return `${Math.round(this.containerHeight)}px`;
+			}
+
+			return "100%";
+		},
+
 		// Dynamic container styles based on parent
 		containerStyles() {
+			const maxHeight = this.tableMaxHeight;
+			const minHeight =
+				this.availableHeight && this.availableHeight < 220
+					? `${Math.max(Math.round(this.availableHeight), 160)}px`
+					: "220px";
+			const maxWidth =
+				this.viewportWidth && this.viewportWidth > 0 ? `${Math.round(this.viewportWidth)}px` : "100vw";
 			return {
-				height: "100%",
-				maxHeight: "100%",
-				minHeight: "100%",
+				height: maxHeight,
+				maxHeight,
+				minHeight,
+				width: "100%",
+				maxWidth,
+				overflowY: "auto",
+				overflowX: "auto",
 				"--container-width": this.containerWidth + "px",
 				"--container-height": this.containerHeight + "px",
+				"--items-table-max-height": maxHeight,
 			};
 		},
 
@@ -580,6 +626,19 @@ export default {
 			};
 		},
 
+		dragHandleColumn() {
+			return {
+				title: "",
+				key: "drag_handle",
+				align: "center",
+				sortable: false,
+				required: true,
+				width: 48,
+				minWidth: 48,
+				class: "drag-handle-header",
+			};
+		},
+
 		blockSaleBeyondAvailableQty() {
 			return (
 				!["Order", "Quotation"].includes(this.invoiceType) &&
@@ -591,8 +650,7 @@ export default {
 		responsiveHeaders() {
 			if (!this.headers || this.headers.length === 0) return [];
 
-			return this.headers
-				.filter((header) => {
+			const filteredHeaders = this.headers.filter((header) => {
 					// Always show required columns
 					if (
 						header.required ||
@@ -618,12 +676,25 @@ export default {
 
 					// Large: show all columns
 					return true;
-				})
-				.map((header) => ({
+				});
+
+			const headersWithDrag = [this.dragHandleColumn, ...filteredHeaders];
+
+			return headersWithDrag.map((header) => {
+				if (header.key === "drag_handle") {
+					return {
+						...header,
+						width: 48,
+						minWidth: 48,
+					};
+				}
+
+				return {
 					...header,
 					width: this.calculateColumnWidth(header),
 					minWidth: this.calculateMinColumnWidth(header),
-				}));
+				};
+			});
 		},
 
 		// Dynamic table density based on container size
@@ -748,8 +819,249 @@ export default {
 				});
 			}
 		},
+		items: {
+			handler() {
+				this.scheduleRowDragSetup();
+			},
+			deep: true,
+		},
 	},
 	methods: {
+		scheduleRowDragSetup() {
+			if (typeof this.debouncedSetupRowDragging === "function") {
+				this.debouncedSetupRowDragging();
+			}
+		},
+
+		setupRowDragging() {
+			this.cleanupRowDragging();
+
+			const tableRoot = this.$el?.querySelector?.(".pos-table");
+			const tbody = tableRoot?.querySelector?.("tbody");
+			if (!tbody) {
+				this.rowElements = [];
+				return;
+			}
+
+			const rows = Array.from(tbody.querySelectorAll("tr")).filter(
+				(row) =>
+					row.classList.contains("v-data-table__tr") &&
+					!row.classList.contains("v-data-table__expanded__content"),
+			);
+
+			if (!rows.length) {
+				this.rowElements = [];
+				return;
+			}
+
+			this.rowElements = rows;
+
+			rows.forEach((row, index) => {
+				row.dataset.rowIndex = String(index);
+				row.classList.add("draggable-row");
+
+				const handle = row.querySelector(".drag-handle");
+				if (handle) {
+					const onDragStart = (event) => this.onRowHandleDragStart(event);
+					const onDragEnd = (event) => this.onRowHandleDragEnd(event);
+					handle.addEventListener("dragstart", onDragStart);
+					handle.addEventListener("dragend", onDragEnd);
+					this.rowDragCleanup.push({ element: handle, type: "dragstart", handler: onDragStart });
+					this.rowDragCleanup.push({ element: handle, type: "dragend", handler: onDragEnd });
+				}
+
+				const onDragEnter = (event) => this.onRowDragEnter(event, index);
+				const onDragOver = (event) => this.onRowDragOver(event, index);
+				const onDragLeave = (event) => this.onRowDragLeave(event, index);
+				const onDrop = (event) => this.onRowDrop(event, index);
+
+				row.addEventListener("dragenter", onDragEnter);
+				row.addEventListener("dragover", onDragOver);
+				row.addEventListener("dragleave", onDragLeave);
+				row.addEventListener("drop", onDrop);
+
+				this.rowDragCleanup.push({ element: row, type: "dragenter", handler: onDragEnter });
+				this.rowDragCleanup.push({ element: row, type: "dragover", handler: onDragOver });
+				this.rowDragCleanup.push({ element: row, type: "dragleave", handler: onDragLeave });
+				this.rowDragCleanup.push({ element: row, type: "drop", handler: onDrop });
+			});
+
+			this.toggleDragActive(false);
+		},
+
+		cleanupRowDragging() {
+			if (Array.isArray(this.rowDragCleanup) && this.rowDragCleanup.length) {
+				this.rowDragCleanup.forEach(({ element, type, handler }) => {
+					element?.removeEventListener?.(type, handler);
+				});
+			}
+			this.rowDragCleanup = [];
+
+			if (Array.isArray(this.rowElements) && this.rowElements.length) {
+				this.rowElements.forEach((row) => {
+					row.classList.remove("drag-source", "drag-over", "draggable-row");
+					if (row.dataset?.rowIndex) {
+						delete row.dataset.rowIndex;
+					}
+				});
+			}
+
+			this.rowElements = [];
+			this.toggleDragActive(false);
+		},
+
+		getRowFromEvent(event) {
+			if (!event) {
+				return null;
+			}
+
+			const target = event.target instanceof Element ? event.target : null;
+			return target?.closest?.("tr[data-row-index]") || null;
+		},
+
+		toggleDragActive(active) {
+			const container = this.$refs?.tableContainer;
+			if (!container) {
+				return;
+			}
+
+			if (active) {
+				container.classList.add("drag-active");
+			} else {
+				container.classList.remove("drag-active");
+			}
+		},
+
+		setDragOverRow(row, index) {
+			if (!row || index === this.draggedIndex) {
+				return;
+			}
+
+			if (this.dragOverIndex !== null && this.dragOverIndex !== index) {
+				const previous = this.rowElements?.[this.dragOverIndex];
+				previous?.classList.remove("drag-over");
+			}
+
+			this.dragOverIndex = index;
+			row.classList.add("drag-over");
+		},
+
+		resetRowDragState() {
+			if (Array.isArray(this.rowElements)) {
+				this.rowElements.forEach((row) => {
+					row.classList.remove("drag-source", "drag-over");
+				});
+			}
+
+			this.toggleDragActive(false);
+			this.draggedItem = null;
+			this.draggedIndex = null;
+			this.dragOverIndex = null;
+			this.isDragging = false;
+		},
+
+		onRowHandleDragStart(event) {
+			const row = this.getRowFromEvent(event);
+			const index = row ? Number(row.dataset.rowIndex) : NaN;
+
+			if (!row || Number.isNaN(index)) {
+				event.preventDefault();
+				return;
+			}
+
+			this.draggedIndex = index;
+			this.draggedItem = this.items?.[index] || null;
+			this.dragOverIndex = null;
+			this.isDragging = true;
+
+			if (event.dataTransfer) {
+				event.dataTransfer.effectAllowed = "move";
+				event.dataTransfer.setData("text/plain", String(index));
+			}
+
+			event.stopPropagation();
+			row.classList.add("drag-source");
+			this.toggleDragActive(true);
+		},
+
+		onRowHandleDragEnd(event) {
+			event?.stopPropagation?.();
+			this.resetRowDragState();
+		},
+
+		onRowDragEnter(event, index) {
+			if (!this.isDragging || index === this.draggedIndex) {
+				return;
+			}
+
+			event.preventDefault();
+			const row = event.currentTarget;
+			if (!row) {
+				return;
+			}
+
+			this.setDragOverRow(row, index);
+		},
+
+		onRowDragOver(event, index) {
+			if (!this.isDragging || index === this.draggedIndex) {
+				return;
+			}
+
+			event.preventDefault();
+			if (event.dataTransfer) {
+				event.dataTransfer.dropEffect = "move";
+			}
+
+			const row = event.currentTarget;
+			if (!row) {
+				return;
+			}
+
+			this.setDragOverRow(row, index);
+		},
+
+		onRowDragLeave(event, index) {
+			if (!this.isDragging || index === this.draggedIndex) {
+				return;
+			}
+
+			const row = event.currentTarget;
+			if (!row) {
+				return;
+			}
+
+			const related = event.relatedTarget instanceof Element ? event.relatedTarget : null;
+			if (related && row.contains(related)) {
+				return;
+			}
+
+			row.classList.remove("drag-over");
+			if (this.dragOverIndex === index) {
+				this.dragOverIndex = null;
+			}
+		},
+
+		onRowDrop(event, index) {
+			if (!this.isDragging) {
+				return;
+			}
+
+			event.preventDefault();
+			event.stopPropagation();
+
+			const fromIndex = this.draggedIndex;
+			const toIndex = index;
+
+			this.resetRowDragState();
+
+			if (fromIndex === null || toIndex === null || fromIndex === toIndex) {
+				return;
+			}
+
+			this.$emit("reorder-items", { fromIndex, toIndex });
+		},
+
 		availableQtyPrecision() {
 			if (this.hide_qty_decimals) {
 				return 0;
@@ -897,12 +1209,28 @@ export default {
 		},
 
 		// Container awareness methods
-		updateContainerDimensions() {
-			if (this.$refs.tableContainer) {
-				const rect = this.$refs.tableContainer.getBoundingClientRect();
-				this.containerWidth = rect.width;
-				this.containerHeight = rect.height;
-				this.updateBreakpoint();
+	updateContainerDimensions() {
+		if (this.$refs.tableContainer) {
+			const rect = this.$refs.tableContainer.getBoundingClientRect();
+			this.containerWidth = rect.width;
+			this.containerHeight = rect.height;
+			this.updateBreakpoint();
+
+				if (typeof window !== "undefined") {
+					const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 0;
+					const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || 0;
+
+					if (viewportWidth) {
+						this.viewportWidth = viewportWidth;
+					}
+
+					if (viewportHeight) {
+						const bottomOffset = 24;
+						const computedHeight = viewportHeight - rect.top - bottomOffset;
+						const minHeight = 160;
+						this.availableHeight = computedHeight > 0 ? Math.max(minHeight, computedHeight) : minHeight;
+					}
+				}
 			}
 		},
 
@@ -922,6 +1250,7 @@ export default {
 
 		calculateColumnWidth(header) {
 			const baseWidths = {
+				drag_handle: { min: 48, max: 48, ratio: 0.04 },
 				item_name: { min: 200, max: 350, ratio: 0.35 },
 				uom: { min: 100, max: 140, ratio: 0.12 },
 				qty: { min: 120, max: 160, ratio: 0.15 },
@@ -942,6 +1271,7 @@ export default {
 
 		calculateMinColumnWidth(header) {
 			const minWidths = {
+				drag_handle: 48,
 				item_name: 180,
 				uom: 90,
 				qty: 100,
@@ -1027,6 +1357,11 @@ export default {
 
 	onDropFromSelector(event) {
 		event.preventDefault();
+
+		const isSelectorPayload = event.dataTransfer?.types?.includes?.("application/json");
+		if (!isSelectorPayload) {
+			return;
+		}
 
 		try {
 			const dragData = JSON.parse(event.dataTransfer.getData("application/json"));
@@ -1137,6 +1472,8 @@ export default {
 				popup.opener = null;
 			}
 		}
+
+		this.scheduleRowDragSetup();
 	},
 	openDetailQtyKeypad(item) {
 		if (!item) {
@@ -1369,6 +1706,14 @@ export default {
 		},
 	},
 
+	created() {
+		this.debouncedSetupRowDragging = _.debounce(() => {
+			this.$nextTick(() => {
+				this.setupRowDragging();
+			});
+		}, 50);
+	},
+
 	mounted() {
 		if (typeof window !== "undefined") {
 			try {
@@ -1377,8 +1722,13 @@ export default {
 			} catch (err) {
 				this.prefersTouchKeypad = false;
 			}
+			this.viewportResizeHandler = _.throttle(() => {
+				this.updateContainerDimensions();
+			}, 100);
+			window.addEventListener("resize", this.viewportResizeHandler);
 		}
 		this.setupResizeObserver();
+		this.scheduleRowDragSetup();
 
 		// Performance optimization: defer non-critical initialization
 		this.$nextTick(() => {
@@ -1401,7 +1751,15 @@ export default {
 	},
 
 	beforeUnmount() {
+		this.cleanupRowDragging();
+		this.debouncedSetupRowDragging?.cancel?.();
+		this.resetRowDragState();
 		this.cleanupResizeObserver();
+		if (typeof window !== "undefined" && this.viewportResizeHandler) {
+			window.removeEventListener("resize", this.viewportResizeHandler);
+			this.viewportResizeHandler.cancel?.();
+			this.viewportResizeHandler = null;
+		}
 
 		// Clean up performance caches to prevent memory leaks
 		if (this.qtyLengthCache) {
@@ -1420,6 +1778,7 @@ export default {
 	box-shadow: 0 2px 8px var(--pos-shadow);
 	border: 1px solid var(--pos-border);
 	height: 100%;
+	max-height: var(--items-table-max-height, 100%);
 	width: 100%;
 	max-width: 100%;
 	display: flex;
@@ -1432,15 +1791,18 @@ export default {
 
 .pos-table :deep(.v-data-table__wrapper) {
 	flex: 1 1 auto;
-	max-height: 100%;
+	max-height: var(--items-table-max-height, 100%);
 	min-height: 0;
+	overflow-y: auto;
 }
 
 /* Ensure items table can scroll when many rows exist */
 .items-table-container {
 	overflow-y: auto;
+	overflow-x: auto;
 	width: 100%;
-	max-width: 100%;
+	max-width: 100vw;
+	min-height: 0;
 	margin: 0;
 	padding: 0;
 	box-sizing: border-box;
@@ -3283,6 +3645,15 @@ body[dir="rtl"] .amount-value.right-aligned {
 	text-align: center;
 }
 
+.pos-table :deep(th[data-column-key="drag_handle"]),
+.pos-table :deep(td[data-column-key="drag_handle"]) {
+	min-width: 48px !important;
+	max-width: 48px !important;
+	width: 48px !important;
+	text-align: center !important;
+	padding: 8px 4px !important;
+}
+
 .pos-table :deep(th[data-column-key="actions"]),
 .pos-table :deep(td[data-column-key="actions"]) {
 	min-width: 80px;
@@ -3320,9 +3691,12 @@ body[dir="rtl"] .amount-value.right-aligned {
 }
 
 .drag-handle-cell {
-	width: 40px;
+	width: 48px;
 	text-align: center;
 	padding: 8px 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .drag-handle {

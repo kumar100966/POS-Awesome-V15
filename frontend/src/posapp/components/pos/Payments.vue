@@ -629,7 +629,7 @@ export default {
 			return this.invoice_doc && this.invoiceType === "Order";
 		},
 		showSalesPersonField() {
-			return this.showOrderDetails || this.is_credit_sale;
+			return !!this.invoice_doc;
 		},
 		showDeliveryDateField() {
 			return this.showOrderDetails || this.is_credit_sale;
@@ -647,7 +647,13 @@ export default {
 			if (!this.invoice_doc) {
 				return false;
 			}
-			return this.showOrderDetails || this.is_credit_sale || this.showShippingAddressField || this.showCreditDueDateField;
+			return (
+				this.showSalesPersonField ||
+				this.showOrderDetails ||
+				this.is_credit_sale ||
+				this.showShippingAddressField ||
+				this.showCreditDueDateField
+			);
 		},
 		showCreditSaleToggle() {
 			return this.invoiceType === "Invoice" && this.invoice_doc && !this.invoice_doc.is_return;
