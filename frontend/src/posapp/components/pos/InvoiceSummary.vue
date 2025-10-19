@@ -1,49 +1,17 @@
 <template>
-	<v-card
-		class="cards mb-0 mt-3 py-2 px-3 rounded-lg resizable pos-themed-card"
-		style="resize: vertical; overflow: auto"
-	>
+	<v-card class="cards mb-0 mt-3 py-2 px-3 rounded-lg resizable pos-themed-card" style="resize: vertical; overflow: auto">
 		<div class="summary-section summary-totals">
 			<v-row dense>
-				<!-- Total Qty -->
-				<v-col cols="12" class="summary-metric-col">
-					<div class="summary-metric-card">
-						<v-icon size="20" class="summary-metric-card__icon">mdi-format-list-numbered</v-icon>
-						<div class="summary-metric-card__label">{{ frappe._('Total Qty') }}</div>
-						<div class="summary-metric-card__value">
-							{{ formatFloat(total_qty, hide_qty_decimals ? 0 : undefined) }}
-						</div>
-					</div>
-				</v-col>
+
 				<!-- Additional Discount (Amount or Percentage) -->
 				<v-col cols="12" v-if="!pos_profile.posa_use_percentage_discount">
-					<v-text-field
-						:model-value="additional_discount"
-						@update:model-value="handleAdditionalDiscountUpdate"
-						@focus="handleAdditionalDiscountFocus"
-						:label="frappe._('Additional Discount')"
-						prepend-inner-icon="mdi-cash-minus"
-						variant="solo"
-						density="compact"
-						color="warning"
-						:prefix="currencySymbol(pos_profile.currency)"
-						:disabled="
-							!pos_profile.posa_allow_user_to_edit_additional_discount ||
-							!!discount_percentage_offer_name
-						"
-						class="summary-field summary-field--metric"
-					>
+					<v-text-field :model-value="additional_discount" @update:model-value="handleAdditionalDiscountUpdate" @focus="handleAdditionalDiscountFocus" :label="frappe._('Additional Discount')" prepend-inner-icon="mdi-cash-minus" variant="solo" density="compact" color="warning" :prefix="currencySymbol(pos_profile.currency)" :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount ||
+						!!discount_percentage_offer_name
+						" class="summary-field summary-field--metric">
 						<template #append-inner>
-							<v-btn
-								icon
-								size="large"
-								class="touch-keypad-btn"
-								:disabled="
-									!pos_profile.posa_allow_user_to_edit_additional_discount ||
-									!!discount_percentage_offer_name
-								"
-								@click.stop="openAdditionalDiscountKeypad"
-							>
+							<v-btn icon size="large" class="touch-keypad-btn" :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount ||
+								!!discount_percentage_offer_name
+								" @click.stop="openAdditionalDiscountKeypad">
 								<v-icon size="28">mdi-dialpad</v-icon>
 							</v-btn>
 						</template>
@@ -51,35 +19,13 @@
 				</v-col>
 
 				<v-col cols="12" v-else>
-					<v-text-field
-						:model-value="additional_discount_percentage"
-						@update:model-value="handleAdditionalDiscountPercentageUpdate"
-						@change="$emit('update_discount_umount')"
-						@focus="handleAdditionalDiscountPercentageFocus"
-						:rules="[isNumber]"
-						:label="frappe._('Additional Discount %')"
-						suffix="%"
-						prepend-inner-icon="mdi-percent"
-						variant="solo"
-						density="compact"
-						color="warning"
-						:disabled="
-							!pos_profile.posa_allow_user_to_edit_additional_discount ||
-							!!discount_percentage_offer_name
-						"
-						class="summary-field summary-field--metric"
-					>
+					<v-text-field :model-value="additional_discount_percentage" @update:model-value="handleAdditionalDiscountPercentageUpdate" @change="$emit('update_discount_umount')" @focus="handleAdditionalDiscountPercentageFocus" :rules="[isNumber]" :label="frappe._('Additional Discount %')" suffix="%" prepend-inner-icon="mdi-percent" variant="solo" density="compact" color="warning" :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount ||
+						!!discount_percentage_offer_name
+						" class="summary-field summary-field--metric">
 						<template #append-inner>
-							<v-btn
-								icon
-								size="large"
-								class="touch-keypad-btn"
-								:disabled="
-									!pos_profile.posa_allow_user_to_edit_additional_discount ||
-									!!discount_percentage_offer_name
-								"
-								@click.stop="openAdditionalDiscountPercentageKeypad"
-							>
+							<v-btn icon size="large" class="touch-keypad-btn" :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount ||
+								!!discount_percentage_offer_name
+								" @click.stop="openAdditionalDiscountPercentageKeypad">
 								<v-icon size="28">mdi-dialpad</v-icon>
 							</v-btn>
 						</template>
@@ -88,17 +34,7 @@
 
 				<!-- Total -->
 				<v-col cols="12">
-					<v-text-field
-						:model-value="formatCurrency(subtotal)"
-						:prefix="currencySymbol(displayCurrency)"
-						:label="frappe._('Total')"
-						prepend-inner-icon="mdi-cash"
-						variant="solo"
-						density="compact"
-						readonly
-						color="success"
-						class="summary-field summary-field--metric"
-					/>
+					<v-text-field :model-value="formatCurrency(subtotal)" :prefix="currencySymbol(displayCurrency)" :label="frappe._('Total')" prepend-inner-icon="mdi-cash" variant="solo" density="compact" readonly color="success" class="summary-field summary-field--metric" />
 				</v-col>
 
 			</v-row>
@@ -109,113 +45,44 @@
 		<div class="summary-section summary-actions">
 			<v-row dense>
 				<v-col cols="12">
-					<v-btn
-						block
-						color="accent"
-						theme="dark"
-						prepend-icon="mdi-content-save"
-						@click="handleSaveAndClear"
-						class="summary-btn"
-						:loading="saveLoading"
-					>
+					<v-btn block color="accent" theme="dark" prepend-icon="mdi-content-save" @click="handleSaveAndClear" class="summary-btn" :loading="saveLoading">
 						{{ __("Save & Clear") }}
 					</v-btn>
 				</v-col>
 				<v-col cols="12">
-					<v-btn
-						block
-						color="warning"
-						theme="dark"
-						prepend-icon="mdi-file-document"
-						@click="handleLoadDrafts"
-						class="white-text-btn summary-btn"
-						:loading="loadDraftsLoading"
-					>
+					<v-btn block color="warning" theme="dark" prepend-icon="mdi-file-document" @click="handleLoadDrafts" class="white-text-btn summary-btn" :loading="loadDraftsLoading">
 						{{ __("Load Drafts") }}
 					</v-btn>
 				</v-col>
 				<v-col cols="12" v-if="pos_profile.custom_allow_select_sales_order == 1">
-					<v-btn
-						block
-						color="info"
-						theme="dark"
-						prepend-icon="mdi-book-search"
-						@click="handleSelectOrder"
-						class="summary-btn"
-						:loading="selectOrderLoading"
-					>
+					<v-btn block color="info" theme="dark" prepend-icon="mdi-book-search" @click="handleSelectOrder" class="summary-btn" :loading="selectOrderLoading">
 						{{ __("Select S.O") }}
 					</v-btn>
 				</v-col>
 				<v-col cols="12">
-					<v-btn
-						block
-						color="error"
-						theme="dark"
-						prepend-icon="mdi-close-circle"
-						@click="handleCancelSale"
-						class="summary-btn"
-						:loading="cancelLoading"
-					>
+					<v-btn block color="error" theme="dark" prepend-icon="mdi-close-circle" @click="handleCancelSale" class="summary-btn" :loading="cancelLoading">
 						{{ __("Cancel Sale") }}
 					</v-btn>
 				</v-col>
 				<v-col cols="12" v-if="pos_profile.posa_allow_return == 1">
-					<v-btn
-						block
-						color="secondary"
-						theme="dark"
-						prepend-icon="mdi-backup-restore"
-						@click="handleOpenReturns"
-						class="summary-btn"
-						:loading="returnsLoading"
-					>
+					<v-btn block color="secondary" theme="dark" prepend-icon="mdi-backup-restore" @click="handleOpenReturns" class="summary-btn" :loading="returnsLoading">
 						{{ __("Sales Return") }}
 					</v-btn>
 				</v-col>
 				<v-col cols="12" v-if="pos_profile.posa_allow_print_draft_invoices">
-					<v-btn
-						block
-						color="primary"
-						theme="dark"
-						prepend-icon="mdi-printer"
-						@click="handlePrintDraft"
-						class="summary-btn"
-						:loading="printLoading"
-					>
+					<v-btn block color="primary" theme="dark" prepend-icon="mdi-printer" @click="handlePrintDraft" class="summary-btn" :loading="printLoading">
 						{{ __("Print Draft") }}
 					</v-btn>
 				</v-col>
 				<v-col cols="12">
-					<v-btn
-						block
-						color="success"
-						theme="dark"
-						size="large"
-						prepend-icon="mdi-credit-card"
-						@click="handleShowPayment"
-						class="summary-btn pay-btn"
-						:loading="paymentLoading"
-					>
+					<v-btn block color="success" theme="dark" size="large" prepend-icon="mdi-credit-card" @click="handleShowPayment" class="summary-btn pay-btn" :loading="paymentLoading">
 						{{ __("PAY") }}
 					</v-btn>
 				</v-col>
 			</v-row>
 		</div>
 	</v-card>
-	<NumericKeypad
-		:visible="numericKeypad.visible"
-		:model-value="numericKeypad.value"
-		:title="numericKeypad.title"
-		:helper-text="numericKeypad.helperText"
-		:allow-decimal="numericKeypad.allowDecimal"
-		:allow-negative="numericKeypad.allowNegative"
-		:decimal-places="numericKeypad.decimalPlaces"
-		@update:modelValue="(val) => (numericKeypad.value = val)"
-		@update:visible="(val) => (numericKeypad.visible = val)"
-		@confirm="handleNumericKeypadConfirm"
-		@cancel="closeNumericKeypad"
-	/>
+	<NumericKeypad :visible="numericKeypad.visible" :model-value="numericKeypad.value" :title="numericKeypad.title" :helper-text="numericKeypad.helperText" :allow-decimal="numericKeypad.allowDecimal" :allow-negative="numericKeypad.allowNegative" :decimal-places="numericKeypad.decimalPlaces" @update:modelValue="(val) => (numericKeypad.value = val)" @update:visible="(val) => (numericKeypad.visible = val)" @confirm="handleNumericKeypadConfirm" @cancel="closeNumericKeypad" />
 </template>
 
 <script>
