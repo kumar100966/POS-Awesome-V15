@@ -419,6 +419,14 @@ export function useItemAddition() {
 			// Only store the row ID to keep expanded array consistent
 			context.expanded.push(new_item.posa_row_id);
 		}
+
+		if (new_item.projected_qty === undefined || new_item.projected_qty === null) {
+			new_item.projected_qty = new_item.available_qty ?? new_item.actual_qty ?? 0;
+		}
+		if (new_item.available_qty === undefined || new_item.available_qty === null) {
+			new_item.available_qty = new_item.projected_qty ?? new_item.actual_qty ?? 0;
+		}
+
 		return new_item;
 	};
 

@@ -1551,6 +1551,13 @@ export default {
 					item.conversion_factor = data.conversion_factor;
 					item.stock_qty = data.stock_qty;
 					item.actual_qty = data.actual_qty;
+					if (Object.prototype.hasOwnProperty.call(data, "available_qty")) {
+						item.available_qty = vm.flt(data.available_qty);
+					} else if (Object.prototype.hasOwnProperty.call(data, "projected_qty")) {
+						item.available_qty = vm.flt(data.projected_qty);
+					} else if (Object.prototype.hasOwnProperty.call(data, "actual_qty")) {
+						item.available_qty = vm.flt(data.actual_qty);
+					}
 					item.stock_uom = data.stock_uom;
 					item.has_serial_no = data.has_serial_no;
 					item.has_batch_no = data.has_batch_no;
@@ -1835,6 +1842,15 @@ export default {
 		const now = Date.now();
 		if (cached && now - cached.ts < 60000) {
 			item.available_qty = cached.qty;
+			if (Object.prototype.hasOwnProperty.call(cached, "projected_qty")) {
+				item.projected_qty = cached.projected_qty;
+			}
+			if (Object.prototype.hasOwnProperty.call(cached, "actual_qty")) {
+				item.actual_qty = cached.actual_qty;
+			}
+			if (Object.prototype.hasOwnProperty.call(cached, "reserved_qty")) {
+				item.reserved_qty = cached.reserved_qty;
+			}
 			this.update_qty_limits(item);
 			return;
 		}
@@ -1851,9 +1867,31 @@ export default {
 					]),
 				},
 			});
-			const qty = r.message && r.message.length ? flt(r.message[0].available_qty) : 0;
-			this.available_stock_cache[key] = { qty, ts: now };
-			item.available_qty = qty;
+			const payload = r.message && r.message.length ? r.message[0] : null;
+			const available_qty = payload ? flt(payload.available_qty) : 0;
+			const projected_qty =
+				payload && payload.projected_qty !== undefined && payload.projected_qty !== null
+					? flt(payload.projected_qty)
+					: available_qty;
+			const actual_qty =
+				payload && payload.actual_qty !== undefined && payload.actual_qty !== null
+					? flt(payload.actual_qty)
+					: available_qty;
+			const reserved_qty =
+				payload && payload.reserved_qty !== undefined && payload.reserved_qty !== null
+					? flt(payload.reserved_qty)
+					: 0;
+			this.available_stock_cache[key] = {
+				qty: available_qty,
+				projected_qty,
+				actual_qty,
+				reserved_qty,
+				ts: now,
+			};
+			item.available_qty = available_qty;
+			item.projected_qty = projected_qty;
+			item.actual_qty = actual_qty;
+			item.reserved_qty = reserved_qty;
 			this.update_qty_limits(item);
 		} catch (e) {
 			console.error("Failed to fetch available qty", e);

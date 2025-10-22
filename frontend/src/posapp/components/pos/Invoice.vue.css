@@ -65,6 +65,20 @@
 	padding: var(--dynamic-sm);
 }
 
+.invoice-main-card {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.invoice-main-card .dynamic-padding {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
 /* Responsive breakpoints */
 @media (max-width: 768px) {
 	.dynamic-padding {
@@ -216,6 +230,10 @@
 
 .items-table-wrapper {
 	position: relative;
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
 	margin-top: var(--dynamic-sm);
 	/* Override parent padding to make table full-width */
 	margin-left: calc(-1 * var(--dynamic-sm));
@@ -223,6 +241,21 @@
 	width: calc(100% + 2 * var(--dynamic-sm));
 	max-width: calc(100% + 2 * var(--dynamic-sm));
 	box-sizing: border-box;
+}
+
+.items-table-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+}
+
+.items-table-scroll :deep(.items-table-container) {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: 100%;
+	width: 100%;
 }
 
 /* New styles for improved column switches */

@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import json
+from functools import lru_cache
 
 import frappe
 from erpnext.stock.doctype.batch.batch import (
@@ -10,6 +11,8 @@ from erpnext.stock.doctype.batch.batch import (
 )
 from erpnext.stock.get_item_details import get_item_details
 from frappe import _
+from frappe.exceptions import DoesNotExistError
+from frappe.query_builder.functions import IfNull, Sum
 from frappe.utils import cstr, flt, get_datetime, nowdate
 from frappe.utils.background_jobs import enqueue
 from frappe.utils.caching import redis_cache
@@ -22,29 +25,156 @@ def normalize_brand(brand: str) -> str:
     return cstr(brand).strip().lower()
 
 
-def get_stock_availability(item_code, warehouse):
-    """Return total available quantity for an item in the given warehouse.
-
-    ``warehouse`` can be either a single warehouse or a warehouse group.
-    In case of a group, quantities from all child warehouses are summed up
-    to provide an accurate availability figure.
-    """
-
+@lru_cache(maxsize=256)
+def _expanded_warehouses(warehouse: str) -> tuple[str, ...]:
+    """Return warehouses to include when the provided warehouse is a group."""
     if not warehouse:
-        return 0.0
+        return ()
 
-    warehouses = [warehouse]
-    if frappe.db.get_value("Warehouse", warehouse, "is_group"):
-        # Include all child warehouses when a group warehouse is set
-        warehouses = frappe.db.get_descendants("Warehouse", warehouse) or []
+    try:
+        doc = frappe.get_cached_doc("Warehouse", warehouse)
+    except DoesNotExistError:
+        return ()
 
-    rows = frappe.get_all(
-        "Bin",
-        fields=["sum(actual_qty) as actual_qty"],
-        filters={"item_code": item_code, "warehouse": ["in", warehouses]},
+    if not doc.is_group:
+        return (warehouse,)
+
+    descendants = frappe.db.get_all(
+        "Warehouse",
+        filters={
+            "lft": (">=", doc.lft),
+            "rgt": ("<=", doc.rgt),
+            "is_group": 0,
+        },
+        pluck="name",
     )
 
-    return flt(rows[0].actual_qty) if rows else 0.0
+    return tuple(descendants or ())
+
+
+def _get_bin_totals(item_code: str, warehouses: tuple[str, ...]) -> frappe._dict:
+    """Aggregate stock figures from Bin for the given item and warehouses."""
+    if not item_code or not warehouses:
+        return frappe._dict()
+
+    bin_doctype = frappe.qb.DocType("Bin")
+
+    rows = (
+        frappe.qb.from_(bin_doctype)
+        .select(
+            Sum(bin_doctype.actual_qty).as_("actual_qty"),
+            Sum(bin_doctype.projected_qty).as_("projected_qty"),
+            Sum(bin_doctype.reserved_qty).as_("reserved_qty"),
+            Sum(bin_doctype.reserved_qty_for_production).as_("reserved_qty_for_production"),
+            Sum(bin_doctype.reserved_qty_for_production_plan).as_("reserved_qty_for_production_plan"),
+            Sum(bin_doctype.reserved_qty_for_sub_contract).as_("reserved_qty_for_sub_contract"),
+        )
+        .where((bin_doctype.item_code == item_code) & (bin_doctype.warehouse.isin(warehouses)))
+    ).run(as_dict=True)
+
+    return frappe._dict(rows[0]) if rows else frappe._dict()
+
+
+def _get_pos_reserved_qty_map(
+    warehouses: tuple[str, ...], item_codes: tuple[str, ...]
+) -> dict[str, float]:
+    """Return POS-reserved quantities for multiple items."""
+    if not warehouses or not item_codes:
+        return {}
+
+    pos_invoice = frappe.qb.DocType("POS Invoice")
+    pos_invoice_item = frappe.qb.DocType("POS Invoice Item")
+    packed_item = frappe.qb.DocType("Packed Item")
+
+    def _reserved_from(child_doctype, qty_field: str) -> dict[str, float]:
+        rows = (
+            frappe.qb.from_(pos_invoice)
+            .inner_join(child_doctype)
+            .on(child_doctype.parent == pos_invoice.name)
+            .select(child_doctype.item_code, Sum(child_doctype[qty_field]).as_("qty"))
+            .where(
+                (IfNull(pos_invoice.consolidated_invoice, "") == "")
+                & (pos_invoice.docstatus == 1)
+                & (child_doctype.docstatus == 1)
+                & (child_doctype.parenttype == "POS Invoice")
+                & (child_doctype.item_code.isin(item_codes))
+                & (child_doctype.warehouse.isin(warehouses))
+            )
+            .groupby(child_doctype.item_code)
+        ).run(as_dict=True)
+
+        return {row.item_code: flt(row.qty) for row in rows}
+
+    reserved_map: dict[str, float] = {}
+    for rows_map in (
+        _reserved_from(pos_invoice_item, "stock_qty"),
+        _reserved_from(packed_item, "qty"),
+    ):
+        for item_code, qty in rows_map.items():
+            reserved_map[item_code] = reserved_map.get(item_code, 0.0) + qty
+
+    return reserved_map
+
+
+def _get_pos_reserved_qty(item_code: str, warehouses: tuple[str, ...]) -> float:
+    """Return stock reserved in unconsolidated POS Invoices for the given item."""
+    if not item_code or not warehouses:
+        return 0.0
+
+    return _get_pos_reserved_qty_map(warehouses, (item_code,)).get(item_code, 0.0)
+
+
+def get_stock_summary(item_code: str, warehouse: str) -> frappe._dict:
+    """Return aggregated stock figures (actual, projected, reserved)."""
+
+    empty_summary = frappe._dict(
+        actual_qty=0.0,
+        projected_qty=0.0,
+        reserved_qty=0.0,
+        reserved_qty_for_production=0.0,
+        reserved_qty_for_production_plan=0.0,
+        reserved_qty_for_sub_contract=0.0,
+        pos_reserved_qty=0.0,
+        available_qty=0.0,
+    )
+
+    if not warehouse or not item_code:
+        return empty_summary
+
+    warehouses = _expanded_warehouses(warehouse)
+
+    if not warehouses:
+        return empty_summary
+
+    bin_totals = _get_bin_totals(item_code, warehouses)
+
+    actual_qty = flt(bin_totals.get("actual_qty"))
+    projected_qty = flt(bin_totals.get("projected_qty"))
+    reserved_qty = flt(bin_totals.get("reserved_qty"))
+    reserved_qty_for_production = flt(bin_totals.get("reserved_qty_for_production"))
+    reserved_qty_for_production_plan = flt(bin_totals.get("reserved_qty_for_production_plan"))
+    reserved_qty_for_sub_contract = flt(bin_totals.get("reserved_qty_for_sub_contract"))
+
+    pos_reserved_qty = _get_pos_reserved_qty(item_code, warehouses)
+    available_qty = projected_qty - pos_reserved_qty
+
+    return frappe._dict(
+        actual_qty=actual_qty,
+        projected_qty=projected_qty,
+        reserved_qty=reserved_qty,
+        reserved_qty_for_production=reserved_qty_for_production,
+        reserved_qty_for_production_plan=reserved_qty_for_production_plan,
+        reserved_qty_for_sub_contract=reserved_qty_for_sub_contract,
+        pos_reserved_qty=pos_reserved_qty,
+        available_qty=available_qty,
+    )
+
+
+def get_stock_availability(item_code, warehouse):
+    """Return total available quantity (actual stock) for an item."""
+
+    summary = get_stock_summary(item_code, warehouse)
+    return summary.actual_qty
 
 
 @frappe.whitelist()
@@ -64,6 +194,7 @@ def get_available_qty(items):
         items = json.loads(items)
 
     result = []
+    summaries = {}
     for it in items or []:
         item_code = it.get("item_code")
         warehouse = it.get("warehouse")
@@ -72,16 +203,28 @@ def get_available_qty(items):
         if not item_code or not warehouse:
             continue
 
+        cache_key = (item_code, warehouse)
+        summary = summaries.get(cache_key)
+        if summary is None:
+            summary = get_stock_summary(item_code, warehouse)
+            summaries[cache_key] = summary
+        available_qty = summary.available_qty
+        actual_qty = summary.actual_qty
+        reserved_qty = summary.reserved_qty
+
         if batch_no:
-            available_qty = get_batch_qty(batch_no, warehouse) or 0
-        else:
-            available_qty = get_stock_availability(item_code, warehouse)
+            batch_qty = get_batch_qty(batch_no, warehouse) or 0
+            available_qty = flt(batch_qty)
 
         result.append(
             {
                 "item_code": item_code,
                 "warehouse": warehouse,
                 "available_qty": flt(available_qty),
+                "projected_qty": flt(summary.projected_qty),
+                "actual_qty": flt(actual_qty),
+                "reserved_qty": flt(reserved_qty),
+                "pos_reserved_qty": flt(summary.pos_reserved_qty),
             }
         )
 
@@ -424,6 +567,14 @@ def get_items_count(pos_profile, item_groups=None):
 def get_item_variants(pos_profile, parent_item_code, price_list=None, customer=None):
     """Return variants of an item along with attribute metadata."""
     pos_profile = json.loads(pos_profile)
+    _get_item_prices = maybe_cache(_get_item_prices)
+    _get_bin_qty = maybe_cache(_get_bin_qty)
+    _get_item_meta = maybe_cache(_get_item_meta)
+    _get_barcodes = maybe_cache(_get_barcodes)
+    _get_uoms = maybe_cache(_get_uoms)
+    _get_batches = maybe_cache(_get_batches)
+    _get_serials = maybe_cache(_get_serials)
+
     price_list = price_list or pos_profile.get("selling_price_list")
 
     fields = [
@@ -512,17 +663,24 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
     items_data = json.loads(items_data)
 
     warehouse = pos_profile.get("warehouse")
+    warehouses = _expanded_warehouses(warehouse)
     if not items_data:
         return []
 
-    ttl = pos_profile.get("posa_server_cache_duration")
-    if ttl:
-        ttl = int(ttl) * 60
+    ttl_setting = pos_profile.get("posa_server_cache_duration")
+    cache_ttl = int(ttl_setting) * 60 if ttl_setting else 300
+    cache_enabled = bool(pos_profile.get("posa_use_server_cache"))
+
+    def maybe_cache(func, ttl_override=None):
+        """Wrap ``func`` with redis_cache when server caching is enabled."""
+        if not cache_enabled:
+            return func
+        ttl_value = ttl_override if ttl_override is not None else cache_ttl
+        return redis_cache(ttl=ttl_value)(func)
 
     def _to_tuple(data):
         return tuple(sorted(data))
 
-    @redis_cache(ttl=ttl or 300)
     def _get_item_prices(price_list, currency, item_codes, customer):
         if not item_codes:
             return []
@@ -579,42 +737,31 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
 					AND (valid_upto IS NULL OR valid_upto = '')
 			) ip
 			ORDER BY IFNULL(customer, '') ASC, valid_from ASC, valid_upto DESC
-		"""
+        """
         return frappe.db.sql(query, params, as_dict=True)
 
-    @redis_cache(ttl=ttl or 300)
-    def _get_bin_qty(warehouse, item_codes):
-        """Fetch stock quantities for multiple items.
-
-        Supports both single warehouses and warehouse groups. When a
-        group warehouse is provided, quantities from all its child
-        warehouses are aggregated.
-        """
-
-        if not item_codes or not warehouse:
+    def _get_bin_qty(warehouses, item_codes):
+        """Fetch aggregated stock quantities for multiple items."""
+        if not item_codes or not warehouses:
             return []
 
-        if frappe.db.get_value("Warehouse", warehouse, "is_group"):
-            warehouses = frappe.db.get_descendants("Warehouse", warehouse) or []
-            if not warehouses:
-                return []
-            return frappe.get_all(
-                "Bin",
-                fields=["item_code", "sum(actual_qty) as actual_qty"],
-                filters={
-                    "warehouse": ["in", warehouses],
-                    "item_code": ["in", item_codes],
-                },
-                group_by="item_code",
+        bin_doctype = frappe.qb.DocType("Bin")
+
+        return (
+            frappe.qb.from_(bin_doctype)
+            .select(
+                bin_doctype.item_code,
+                Sum(bin_doctype.actual_qty).as_("actual_qty"),
+                Sum(bin_doctype.projected_qty).as_("projected_qty"),
+                Sum(bin_doctype.reserved_qty).as_("reserved_qty"),
             )
+            .where(
+                (bin_doctype.item_code.isin(item_codes))
+                & (bin_doctype.warehouse.isin(warehouses))
+            )
+            .groupby(bin_doctype.item_code)
+        ).run(as_dict=True)
 
-        return frappe.get_all(
-            "Bin",
-            fields=["item_code", "actual_qty"],
-            filters={"warehouse": warehouse, "item_code": ["in", item_codes]},
-        )
-
-    @redis_cache(ttl=ttl or 300)
     def _get_item_meta(item_codes):
         if not item_codes:
             return []
@@ -624,7 +771,6 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
             filters={"name": ["in", item_codes]},
         )
 
-    @redis_cache(ttl=ttl or 300)
     def _get_barcodes(item_codes):
         if not item_codes:
             return []
@@ -634,7 +780,6 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
             filters={"parent": ["in", item_codes]},
         )
 
-    @redis_cache(ttl=ttl or 300)
     def _get_uoms(item_codes):
         if not item_codes:
             return []
@@ -644,7 +789,6 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
             filters={"parent": ["in", item_codes]},
         )
 
-    @redis_cache(ttl=ttl or 300)
     def _get_batches(warehouse, item_codes):
         """Fetch batch data and quantities for multiple items."""
         if not item_codes or not warehouse:
@@ -668,7 +812,6 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
                     )
         return rows
 
-    @redis_cache(ttl=ttl or 300)
     def _get_serials(warehouse, item_codes):
         if not item_codes or not warehouse:
             return []
@@ -706,10 +849,11 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
     item_codes_tuple = _to_tuple(item_codes)
 
     price_rows = _get_item_prices(price_list, price_list_currency, item_codes_tuple, customer)
-    stock_rows = _get_bin_qty(warehouse, item_codes_tuple)
+    stock_rows = _get_bin_qty(warehouses, item_codes_tuple)
     meta_rows = _get_item_meta(item_codes_tuple)
     uom_rows = _get_uoms(item_codes_tuple)
     barcode_rows = _get_barcodes(item_codes_tuple)
+    pos_reserved_map = _get_pos_reserved_qty_map(warehouses, item_codes_tuple)
 
     # Determine which items require batch or serial data
     batch_items = [d.name for d in meta_rows if d.has_batch_no]
@@ -723,7 +867,9 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
         price_map.setdefault(d.item_code, {})
         price_map[d.item_code][d.get("uom") or "None"] = d
 
-    stock_map = {d.item_code: d.actual_qty for d in stock_rows}
+    stock_map = {d.item_code: flt(d.actual_qty) for d in stock_rows}
+    projected_map = {d.item_code: flt(d.projected_qty) for d in stock_rows if d.get("projected_qty") is not None}
+    reserved_map = {d.item_code: flt(d.reserved_qty) for d in stock_rows if d.get("reserved_qty") is not None}
     meta_map = {d.name: d for d in meta_rows}
 
     uom_map = {}
@@ -774,11 +920,23 @@ def get_items_details(pos_profile, items_data, price_list=None, customer=None):
 
         row = {}
         row.update(item)
+        actual_qty = stock_map.get(item_code, 0) or 0
+        projected_qty = projected_map.get(item_code)
+        if projected_qty is None:
+            projected_qty = actual_qty
+        reserved_qty = reserved_map.get(item_code, 0) or 0
+        pos_reserved_qty = pos_reserved_map.get(item_code, 0.0)
+        available_qty = projected_qty - pos_reserved_qty
+
         row.update(
             {
                 "item_uoms": uoms or [],
                 "item_barcode": barcode_map.get(item_code, []),
-                "actual_qty": stock_map.get(item_code, 0) or 0,
+                "actual_qty": actual_qty,
+                "projected_qty": projected_qty,
+                "reserved_qty": reserved_qty,
+                "pos_reserved_qty": pos_reserved_qty,
+                "available_qty": available_qty,
                 "has_batch_no": meta.get("has_batch_no"),
                 "has_serial_no": meta.get("has_serial_no"),
                 "batch_no_data": batch_map.get(item_code, []),
@@ -886,7 +1044,12 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
         overwrite_warehouse=False,
     )
     if item.get("is_stock_item") and warehouse:
-        res["actual_qty"] = get_stock_availability(item_code, warehouse)
+        summary = get_stock_summary(item_code, warehouse)
+        res["actual_qty"] = summary.actual_qty
+        res["projected_qty"] = summary.projected_qty
+        res["reserved_qty"] = summary.reserved_qty
+        res["available_qty"] = summary.available_qty
+        res["pos_reserved_qty"] = summary.pos_reserved_qty
     res["max_discount"] = max_discount
     res["batch_no_data"] = batch_no_data
     res["serial_no_data"] = serial_no_data

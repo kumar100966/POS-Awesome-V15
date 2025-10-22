@@ -453,11 +453,11 @@ export default {
 	}),
 
 	watch: {
-		showModal(value) {
-			if (value) {
-				this.refreshItemsStockFromServer();
-			}
-		},
+	showModal(value) {
+		if (value) {
+			this.refreshItemsStockFromServer({ force: true, emit: true });
+		}
+	},
 		"imagePreview.visible"(visible) {
 			if (!visible && this.imagePreview.src) {
 				this.$nextTick(() => {
@@ -746,8 +746,12 @@ export default {
 					const qtyMap = new Map();
 					rows.forEach((row) => {
 						if (row?.item_code) {
-							const qty = Number(row.available_qty ?? 0);
-							qtyMap.set(row.item_code, qty);
+							qtyMap.set(row.item_code, {
+								available_qty: Number(row.available_qty ?? row.projected_qty ?? row.actual_qty ?? 0),
+								projected_qty: Number(row.projected_qty ?? row.available_qty ?? row.actual_qty ?? 0),
+								actual_qty: Number(row.actual_qty ?? row.available_qty ?? 0),
+								reserved_qty: Number(row.reserved_qty ?? 0),
+							});
 						}
 					});
 					if (!qtyMap.size) {
@@ -755,12 +759,25 @@ export default {
 					}
 					this.items.forEach((item) => {
 						if (qtyMap.has(item.item_code)) {
-							const qty = qtyMap.get(item.item_code);
-							if (item.actual_qty !== qty || item.available_qty !== qty) {
-								item.actual_qty = qty;
-								item.available_qty = qty;
-								didUpdate = true;
+							const info = qtyMap.get(item.item_code);
+							let itemUpdated = false;
+							if (Number.isFinite(info.actual_qty) && item.actual_qty !== info.actual_qty) {
+								item.actual_qty = info.actual_qty;
+								itemUpdated = true;
 							}
+							if (Number.isFinite(info.projected_qty) && item.projected_qty !== info.projected_qty) {
+								item.projected_qty = info.projected_qty;
+								itemUpdated = true;
+							}
+							if (Number.isFinite(info.available_qty) && item.available_qty !== info.available_qty) {
+								item.available_qty = info.available_qty;
+								itemUpdated = true;
+							}
+							if (Number.isFinite(info.reserved_qty) && item.reserved_qty !== info.reserved_qty) {
+								item.reserved_qty = info.reserved_qty;
+								itemUpdated = true;
+							}
+							if (itemUpdated) didUpdate = true;
 						}
 					});
 				} catch (error) {
@@ -781,34 +798,47 @@ export default {
 
 			return didUpdate;
 		},
-		async handleRefreshItemsStock(soldItems = []) {
-			if (!Array.isArray(soldItems) || !soldItems.length) {
-				return;
-			}
-			const codes = soldItems
-				.map((item) => item?.item_code)
-				.filter(Boolean);
-			await this.updateAvailabilityForCodes(codes);
-		},
-		async refreshItemsStockFromServer() {
-			if (!this.items || !this.items.length || isOffline()) {
-				return;
-			}
-			const now = Date.now();
-			if (this.lastStockRefresh && now - this.lastStockRefresh < 5000) {
-				return;
-			}
-			this.lastStockRefresh = now;
-			const codes = this.items.map((item) => item?.item_code).filter(Boolean);
-			await this.updateAvailabilityForCodes(codes);
-		},
+	async handleRefreshItemsStock(soldItems = []) {
+		if (!Array.isArray(soldItems) || !soldItems.length) {
+			return;
+		}
+		const codes = soldItems
+			.map((item) => item?.item_code)
+			.filter(Boolean);
+		await this.refreshItemsStockFromServer({ force: true, codes, emit: true });
+	},
+	async refreshItemsStockFromServer(options = {}) {
+		if (!this.items || !this.items.length || isOffline()) {
+			return false;
+		}
+		const { force = false, codes = null, emit = false } = options;
+		const now = Date.now();
+		if (!force && this.lastStockRefresh && now - this.lastStockRefresh < 5000) {
+			return false;
+		}
+		const codeList =
+			Array.isArray(codes) && codes.length
+				? codes.filter(Boolean)
+				: this.items.map((item) => item?.item_code).filter(Boolean);
+		if (!codeList.length) {
+			return false;
+		}
+		this.lastStockRefresh = now;
+		const updated = await this.updateAvailabilityForCodes(codeList);
+		if (emit && !updated) {
+			this.eventBus.emit("refresh_invoice_item_stock", codeList);
+		}
+		return updated;
+	},
 		// Utility helpers
 		getItemUomQuantities(item) {
 			if (!item) {
 				return [];
 			}
 
-			const baseQty = Number(item.actual_qty ?? 0);
+			const baseQty = Number(
+				item.available_qty ?? item.projected_qty ?? item.actual_qty ?? 0,
+			);
 			const uoms = Array.isArray(item.item_uoms) && item.item_uoms.length > 0
 				? item.item_uoms
 				: item.stock_uom
@@ -1018,6 +1048,12 @@ export default {
 			});
 			const total = pageItems.length || 1;
 			pageItems.forEach((it, idx) => {
+				if (it.projected_qty === undefined || it.projected_qty === null) {
+					it.projected_qty = it.available_qty ?? it.actual_qty ?? 0;
+				}
+				if (it.available_qty === undefined || it.available_qty === null) {
+					it.available_qty = it.projected_qty ?? it.actual_qty ?? 0;
+				}
 				this.items.push(it);
 				const progress = Math.round(((idx + 1) / total) * 100);
 				this.loadProgress = progress;
@@ -1427,6 +1463,14 @@ export default {
 					// Set default quantity
 					if (item.actual_qty === undefined) {
 						item.actual_qty = 0;
+					}
+
+					if (item.projected_qty === undefined || item.projected_qty === null) {
+						item.projected_qty = item.available_qty ?? item.actual_qty ?? 0;
+					}
+
+					if (item.available_qty === undefined || item.available_qty === null) {
+						item.available_qty = item.projected_qty ?? item.actual_qty ?? 0;
 					}
 				});
 
@@ -1840,8 +1884,11 @@ export default {
 			}
 			await this.add_item(item);
 		},
-		async add_item(item) {
-			item = { ...item };
+	async add_item(item) {
+			if (!item) {
+				return;
+			}
+
 			if (item.has_variants) {
 				let variants = this.items.filter((it) => it.variant_of == item.item_code);
 				let attrsMeta = {};
@@ -1873,66 +1920,110 @@ export default {
 				// Ensure attributes meta is always an object
 				attrsMeta = attrsMeta || {};
 				this.eventBus.emit("open_variants_model", item, variants, this.pos_profile, attrsMeta);
-			} else {
-				if (item.actual_qty === 0 && this.pos_profile.posa_display_items_in_stock) {
-					this.eventBus.emit("show_message", {
-						title: `No stock available for ${item.item_name}`,
-						color: "warning",
-					});
-					await this.update_items_details([item]);
-					return;
-				}
+		} else {
+			const sourceItem =
+				this.items.includes(item)
+					? item
+					: this.items.find((catalogItem) => catalogItem.item_code === item.item_code) || item;
 
-				// Ensure UOMs are initialized before adding the item
-				if (!item.item_uoms || item.item_uoms.length === 0) {
-					// If UOMs are not available, fetch them first
-					await this.update_items_details([item]);
+			await this.update_items_details([sourceItem], { force: true, emit: true });
 
-					// Add stock UOM as fallback
-					if (!item.item_uoms || item.item_uoms.length === 0) {
-						item.item_uoms = [{ uom: item.stock_uom, conversion_factor: 1.0 }];
-					}
+			const selectedItem = { ...sourceItem };
+			const preserveKeys = [
+				"qty",
+				"_barcode_qty",
+				"uom",
+				"to_set_serial_no",
+				"to_set_batch_no",
+				"batch_no",
+				"serial_no",
+			];
+			preserveKeys.forEach((key) => {
+				if (Object.prototype.hasOwnProperty.call(item, key)) {
+					selectedItem[key] = item[key];
 				}
+			});
 
-				// Ensure correct rate based on selected currency
-				if (this.pos_profile.posa_allow_multi_currency) {
-					this.applyCurrencyConversionToItem(item);
-
-					// Compute base rates from original values
-					const base_rate =
-						item.original_currency === this.pos_profile.currency
-							? item.original_rate
-							: item.original_rate * (item.plc_conversion_rate || this.exchange_rate);
-					item.base_rate = base_rate;
-					item.base_price_list_rate = base_rate;
-				}
-
-				const hasBarcodeQty = item._barcode_qty;
-				if (!item.qty || (item.qty === 1 && !hasBarcodeQty)) {
-					let qtyVal = this.qty != null ? this.qty : 1;
-					qtyVal = Math.abs(qtyVal);
-					if (this.hide_qty_decimals) {
-						qtyVal = Math.trunc(qtyVal);
-					}
-					item.qty = qtyVal;
-				}
-				if (!item.uom && item.stock_uom) {
-					item.uom = item.stock_uom;
-				}
-				const payload = {
-					...item,
-					item_uoms: Array.isArray(item.item_uoms)
-						? item.item_uoms.map((uom) => ({ ...uom }))
-						: item.stock_uom
-							? [{ uom: item.stock_uom, conversion_factor: 1 }]
-							: [],
-				};
-				delete payload._barcode_qty;
-				this.eventBus.emit("add_item", payload);
-				this.qty = 1;
-				// Close modal after adding item
-				this.showModal = false;
+			if (selectedItem.actual_qty === 0 && this.pos_profile.posa_display_items_in_stock) {
+				this.eventBus.emit("show_message", {
+					title: `No stock available for ${selectedItem.item_name}`,
+					color: "warning",
+				});
+				return;
 			}
+
+			// Ensure UOMs are initialized before adding the item
+			if (!selectedItem.item_uoms || selectedItem.item_uoms.length === 0) {
+				await this.update_items_details([sourceItem], { force: true });
+
+				selectedItem.item_uoms = Array.isArray(sourceItem.item_uoms)
+					? sourceItem.item_uoms.map((uom) => ({ ...uom }))
+					: [];
+
+				// Add stock UOM as fallback
+				if (!selectedItem.item_uoms || selectedItem.item_uoms.length === 0) {
+					selectedItem.item_uoms = [{ uom: selectedItem.stock_uom, conversion_factor: 1.0 }];
+				}
+				sourceItem.item_uoms = selectedItem.item_uoms.map((uom) => ({ ...uom }));
+			}
+
+			// Ensure correct rate based on selected currency
+			if (this.pos_profile.posa_allow_multi_currency) {
+				if (!selectedItem.original_currency) {
+					selectedItem.original_currency =
+						selectedItem.currency || this.pos_profile.currency;
+				}
+				if (!selectedItem.original_rate) {
+					selectedItem.original_rate = selectedItem.rate;
+				}
+
+				this.applyCurrencyConversionToItem(selectedItem);
+
+				// Compute base rates from original values
+				const base_rate =
+					selectedItem.original_currency === this.pos_profile.currency
+						? selectedItem.original_rate
+						: selectedItem.original_rate *
+							(selectedItem.plc_conversion_rate || this.exchange_rate);
+				selectedItem.base_rate = base_rate;
+				selectedItem.base_price_list_rate = base_rate;
+			}
+
+			const hasBarcodeQty = selectedItem._barcode_qty;
+			if (!selectedItem.qty || (selectedItem.qty === 1 && !hasBarcodeQty)) {
+				let qtyVal = this.qty != null ? this.qty : 1;
+				qtyVal = Math.abs(qtyVal);
+				if (this.hide_qty_decimals) {
+					qtyVal = Math.trunc(qtyVal);
+				}
+				selectedItem.qty = qtyVal;
+			}
+			if (!selectedItem.uom && selectedItem.stock_uom) {
+				selectedItem.uom = selectedItem.stock_uom;
+			}
+
+			const payload = {
+				...selectedItem,
+				item_uoms: Array.isArray(selectedItem.item_uoms)
+					? selectedItem.item_uoms.map((uom) => ({ ...uom }))
+					: selectedItem.stock_uom
+						? [{ uom: selectedItem.stock_uom, conversion_factor: 1 }]
+						: [],
+			};
+			delete payload._barcode_qty;
+
+			this.eventBus.emit("add_item", payload);
+
+			await this.refreshItemsStockFromServer({
+				force: true,
+				codes: [payload.item_code],
+				emit: true,
+			});
+
+			this.qty = 1;
+			// Close modal after adding item
+			this.showModal = false;
+		}
 		},
 		async enter_event() {
 			if (!this.filtered_items.length || !this.first_search) {
@@ -2168,22 +2259,41 @@ export default {
 			this.qty = 1;
 			this.$refs.debounce_search.focus();
 		},
-		async update_items_details(items) {
-			const vm = this;
-			if (!items || !items.length) return;
+	async update_items_details(items, options = {}) {
+		const vm = this;
+		if (!items || !items.length) return;
+		const { force = false, emit = false } = options;
 
-			// reset any pending retry timer
-			if (vm.itemDetailsRetryTimeout) {
-				clearTimeout(vm.itemDetailsRetryTimeout);
-				vm.itemDetailsRetryTimeout = null;
+		// reset any pending retry timer
+		if (vm.itemDetailsRetryTimeout) {
+			clearTimeout(vm.itemDetailsRetryTimeout);
+			vm.itemDetailsRetryTimeout = null;
+		}
+
+			const itemCodes = items
+				.map((it) => it.item_code)
+				.filter((code) => typeof code === "string" && code.length);
+			if (!itemCodes.length) {
+				if (emit) {
+					this.eventBus.emit("set_all_items", this.items);
+				}
+				return;
 			}
 
-			const itemCodes = items.map((it) => it.item_code);
 			const cacheResult = await getCachedItemDetails(
 				vm.pos_profile.name,
 				vm.active_price_list,
 				itemCodes,
 			);
+
+			let missingCodes = new Set(cacheResult.missing);
+			let allCached = !force && missingCodes.size === 0;
+
+			if (force) {
+				missingCodes = new Set(itemCodes);
+				allCached = false;
+			}
+
 			cacheResult.cached.forEach((det) => {
 				const item = items.find((it) => it.item_code === det.item_code);
 				if (item) {
@@ -2217,12 +2327,11 @@ export default {
 				}
 			});
 
-			let allCached = cacheResult.missing.length === 0;
 			items.forEach((item) => {
 				const localQty = getLocalStock(item.item_code);
 				if (localQty !== null) {
 					item.actual_qty = localQty;
-				} else {
+				} else if (!force) {
 					allCached = false;
 				}
 
@@ -2232,7 +2341,7 @@ export default {
 						item.item_uoms = cachedUoms;
 					} else if (isOffline()) {
 						item.item_uoms = [{ uom: item.stock_uom, conversion_factor: 1.0 }];
-					} else {
+					} else if (!force) {
 						allCached = false;
 					}
 				}
@@ -2241,15 +2350,21 @@ export default {
 			// When offline or everything is cached, skip server call
 			if (isOffline() || allCached) {
 				vm.itemDetailsRetryCount = 0;
+				if (emit) {
+					this.eventBus.emit("set_all_items", this.items);
+				}
 				return;
 			}
 
 			const itemsToFetch = items.filter(
-				(it) => cacheResult.missing.includes(it.item_code) && !it.has_variants,
+				(it) => missingCodes.has(it.item_code) && !it.has_variants,
 			);
 
 			if (itemsToFetch.length === 0) {
 				vm.itemDetailsRetryCount = 0;
+				if (emit) {
+					this.eventBus.emit("set_all_items", this.items);
+				}
 				return;
 			}
 
@@ -2348,10 +2463,14 @@ export default {
 						vm.itemDetailsRetryCount += 1;
 						const delay = Math.min(32000, 1000 * Math.pow(2, vm.itemDetailsRetryCount - 1));
 						vm.itemDetailsRetryTimeout = setTimeout(() => {
-							vm.update_items_details(items);
+							vm.update_items_details(items, options);
 						}, delay);
 					}
 				}
+			}
+
+			if (emit) {
+				this.eventBus.emit("set_all_items", this.items);
 			}
 
 			// Cleanup on component destroy
@@ -3369,7 +3488,7 @@ export default {
 
 		// Refresh item quantities when connection to server is restored
 		this.eventBus.on("server-online", async () => {
-			await this.refreshItemsStockFromServer();
+			await this.refreshItemsStockFromServer({ force: true, emit: true });
 		});
 
 		if (typeof Worker !== "undefined") {

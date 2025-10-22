@@ -7,12 +7,7 @@
 		<div class="invoice-content-grid">
 			<div class="invoice-content-left">
 				<!-- Main Invoice Card (contains all invoice content) -->
-				<v-card ref="invoiceCard" :style="{
-					height: invoiceHeight || 'var(--container-height)',
-					maxHeight: invoiceHeight || 'var(--container-height)',
-					resize: 'vertical',
-					overflow: 'auto',
-				}" :class="['cards my-0 py-0 mt-3 resizable', 'pos-themed-card', { 'return-mode': isReturnInvoice }]" @mouseup="saveInvoiceHeight" @touchend="saveInvoiceHeight">
+				<v-card ref="invoiceCard" :style="invoiceCardStyles" :class="['cards my-0 py-0 mt-3 resizable', 'pos-themed-card', 'invoice-main-card', { 'return-mode': isReturnInvoice }]" @mouseup="saveInvoiceHeight" @touchend="saveInvoiceHeight">
 					<!-- Dynamic padding wrapper -->
 					<div class="dynamic-padding">
 						<!-- Top Row: Customer Selection and Invoice Type -->
@@ -108,7 +103,45 @@
 							</div>
 
 							<!-- ItemsTable component with reorder event handler -->
-							<ItemsTable ref="itemsTable" :headers="items_headers" :items="items" v-model:expanded="expanded" :itemsPerPage="itemsPerPage" :itemSearch="itemSearch" :pos_profile="pos_profile" :invoice_doc="invoice_doc" :invoiceType="invoiceType" :stock_settings="stock_settings" :displayCurrency="displayCurrency" :formatFloat="formatFloat" :formatCurrency="formatCurrency" :currencySymbol="currencySymbol" :isNumber="isNumber" :setFormatedQty="setFormatedQty" :setFormatedCurrency="setFormatedCurrency" :calcPrices="calc_prices" :calcUom="calc_uom" :setSerialNo="set_serial_no" :setBatchQty="set_batch_qty" :validateDueDate="validate_due_date" :removeItem="remove_item" :subtractOne="subtract_one" :addOne="add_one" :toggleOffer="toggleOffer" :changePriceListRate="change_price_list_rate" :isNegative="isNegative" @update:expanded="handleExpandedUpdate" @reorder-items="handleItemReorder" @add-item-from-drag="handleItemDrop" @show-drop-feedback="showDropFeedback" @item-dropped="showDropFeedback(false)" @view-packed="openPackedItems" @stock-limit-reached="handleStockLimitWarning" />
+							<div class="items-table-scroll">
+								<ItemsTable
+									ref="itemsTable"
+									:headers="items_headers"
+									:items="items"
+									v-model:expanded="expanded"
+									:itemsPerPage="itemsPerPage"
+									:itemSearch="itemSearch"
+									:pos_profile="pos_profile"
+									:invoice_doc="invoice_doc"
+									:invoiceType="invoiceType"
+									:stock_settings="stock_settings"
+									:displayCurrency="displayCurrency"
+									:formatFloat="formatFloat"
+									:formatCurrency="formatCurrency"
+									:currencySymbol="currencySymbol"
+									:isNumber="isNumber"
+									:setFormatedQty="setFormatedQty"
+									:setFormatedCurrency="setFormatedCurrency"
+									:calcPrices="calc_prices"
+									:calcUom="calc_uom"
+									:setSerialNo="set_serial_no"
+									:setBatchQty="set_batch_qty"
+									:validateDueDate="validate_due_date"
+									:removeItem="remove_item"
+									:subtractOne="subtract_one"
+									:addOne="add_one"
+									:toggleOffer="toggleOffer"
+									:changePriceListRate="change_price_list_rate"
+									:isNegative="isNegative"
+									@update:expanded="handleExpandedUpdate"
+									@reorder-items="handleItemReorder"
+									@add-item-from-drag="handleItemDrop"
+									@show-drop-feedback="showDropFeedback"
+									@item-dropped="showDropFeedback(false)"
+									@view-packed="openPackedItems"
+									@stock-limit-reached="handleStockLimitWarning"
+								/>
+							</div>
 							<v-dialog v-model="show_packed_dialog" max-width="800px" attach="body">
 								<v-card>
 									<v-card-title class="d-flex align-center">
@@ -270,6 +303,17 @@ export default {
 	},
 	computed: {
 		...invoiceComputed,
+		invoiceCardStyles() {
+			const height = this.invoiceHeight || "var(--container-height)";
+			return {
+				height,
+				maxHeight: height,
+				resize: "vertical",
+				display: "flex",
+				flexDirection: "column",
+				overflow: "hidden",
+			};
+		},
 	},
 
 	methods: {
@@ -320,6 +364,26 @@ export default {
 			}
 
 			return Array.from(tokens);
+		},
+		refreshInvoiceItemStock(codes) {
+			if (!Array.isArray(this.items) || !this.items.length) {
+				return;
+			}
+
+			const codeSet =
+				Array.isArray(codes) && codes.length
+					? new Set(codes.filter(Boolean))
+					: null;
+
+			this.items.forEach((item) => {
+				if (codeSet && !codeSet.has(item.item_code)) {
+					return;
+				}
+				this.update_item_detail(item, true);
+				if (typeof this.fetch_available_qty === "function") {
+					this.fetch_available_qty(item);
+				}
+			});
 		},
 		findInvoiceItemByQuery(query) {
 			if (!query) {
@@ -581,6 +645,11 @@ export default {
 					localStorage.setItem("posawesome_invoice_height", this.invoiceHeight);
 				} catch (e) {
 					console.error("Failed to save invoice height:", e);
+				}
+				if (this.$refs.itemsTable?.updateContainerDimensions) {
+					this.$nextTick(() => {
+						this.$refs.itemsTable.updateContainerDimensions();
+					});
 				}
 			}
 		},
@@ -1266,6 +1335,7 @@ export default {
 		this.eventBus.on("add_item", (item) => {
 			this.add_item(item);
 		});
+		this.eventBus.on("refresh_invoice_item_stock", this.refreshInvoiceItemStock);
 		this.eventBus.on("update_customer", (customer) => {
 			this.customer = customer;
 		});
@@ -1360,6 +1430,7 @@ export default {
 		// Existing cleanup
 		this.eventBus.off("register_pos_profile");
 		this.eventBus.off("add_item");
+		this.eventBus.off("refresh_invoice_item_stock", this.refreshInvoiceItemStock);
 		this.eventBus.off("update_customer");
 		this.eventBus.off("fetch_customer_details");
 		this.eventBus.off("clear_invoice");
@@ -1452,6 +1523,20 @@ export default {
 .dynamic-padding {
 	/* Uniform spacing for better alignment */
 	padding: var(--dynamic-sm);
+}
+
+.invoice-main-card {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.invoice-main-card .dynamic-padding {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
 }
 
 /* Responsive breakpoints */
@@ -1605,6 +1690,10 @@ export default {
 
 .items-table-wrapper {
 	position: relative;
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
 	margin-top: var(--dynamic-sm);
 	/* Override parent padding to make table full-width */
 	margin-left: calc(-1 * var(--dynamic-sm));
@@ -1612,6 +1701,21 @@ export default {
 	width: calc(100% + 2 * var(--dynamic-sm));
 	max-width: calc(100% + 2 * var(--dynamic-sm));
 	box-sizing: border-box;
+}
+
+.items-table-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+}
+
+.items-table-scroll :deep(.items-table-container) {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: 100%;
+	width: 100%;
 }
 
 /* New styles for improved column switches */
